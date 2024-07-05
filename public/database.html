@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/common.js"></script>
+  <meta charset="utf-8" />
+  <title>Database Viewer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+    }
+    .filter-buttons {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .filter-buttons button {
+      background-color: #007aff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 0 5px;
+      transition: background-color 0.3s;
+    }
+    .filter-buttons button:hover {
+      background-color: #0056b3;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: left;
+    }
+    th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+    }
+    tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    (function() {
+      const sessionId = localStorage.getItem('sessionId');
+      if (!sessionId) {
+        window.location.href = '/login';
+      }
+    })();
+  </script>
+  <div class="container">
+    <h1>QC Log Database Viewer</h1>
+    <div class="filter-buttons">
+      <button onclick="filterData('T1')">Filter T1</button>
+      <button onclick="filterData('FLAIR')">Filter FLAIR</button>
+      <button onclick="resetFilter()">Reset Filter</button>
+      <button onclick="exportCSV()">Export Filtered Data as CSV</button>
+      <button onclick="logout()" class="nav-button logout">Logout</button>
+    </div>
+    <table id="data-table">
+      <thead>
+        <tr>
+          <th>USERNAME</th>
+          <th>PATIENT ID</th>
+          <th>SESSION ID</th>
+          <th>OPTION</th>
+          <th>IMAGE TYPE</th>
+          <th>DATE</th>
+          <th>TIME</th>
+        </tr>
+      </thead>
+      <tbody id="data-table-body">
+        <!-- Data will be inserted here -->
+      </tbody>
+    </table>
+  </div>
+  <script>
+    let currentFilter = '';
+
+    function fetchData(filter) {
+      fetch('/database', {
+        headers: {
+          'X-Session-Id': localStorage.getItem('sessionId')
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        const filteredData = filter ? data.filter(row => row.imageType === filter) : data;
+        displayData(filteredData);
+      })
+      .catch(error => console.error('Error fetching data:', error));
+    }
+
+    function displayData(data) {
+      const tableBody = document.getElementById('data-table-body');
+      tableBody.innerHTML = '';
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        Object.values(row).forEach(cell => {
+          const td = document.createElement('td');
+          td.textContent = cell;
+          tr.appendChild(td);
+        });
+        tableBody.appendChild(tr);
+      });
+    }
+
+    function filterData(imageType) {
+      currentFilter = imageType;
+      fetchData(imageType);
+    }
+
+    function resetFilter() {
+      currentFilter = '';
+      fetchData();
+    }
+
+    function exportCSV() {
+      fetch('/export-csv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-Id': localStorage.getItem('sessionId')
+        },
+        body: JSON.stringify({ filter: currentFilter })
+      })
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'exported_qc_log.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      })
+      .catch(error => console.error('Error exporting CSV:', error));
+    }
+
+    // Fetch and display data on page load
+    fetchData();
+  </script>
+</body>
+</html>

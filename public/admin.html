@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .user-form, .user-list {
+            margin-bottom: 30px;
+        }
+        .user-form input, .user-form select {
+            margin-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <h1>Admin Panel</h1>
+        <div class="user-form">
+            <h2>Create New User</h2>
+            <form id="createUserForm">
+                <input type="text" id="username" placeholder="Username" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <select id="is_admin">
+                    <option value="0">Regular User</option>
+                    <option value="1">Admin User</option>
+                </select>
+                <button type="submit">Create User</button>
+            </form>
+        </div>
+        <div class="user-list">
+            <h2>User List</h2>
+            <table id="userTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Admin</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <button onclick="window.location.href='/filter.html'">Back to Main Page</button>
+    </div>
+
+    <script>
+        document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const is_admin = document.getElementById('is_admin').value === '1';
+
+            try {
+                const response = await fetch('/create-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password, is_admin }),
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('User created successfully');
+                    document.getElementById('createUserForm').reset();
+                    fetchUsers();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while creating the user');
+            }
+        });
+
+        async function fetchUsers() {
+            try {
+                const response = await fetch('/users');
+                const users = await response.json();
+                const tableBody = document.querySelector('#userTable tbody');
+                tableBody.innerHTML = '';
+                users.forEach(user => {
+                    const row = tableBody.insertRow();
+                    row.insertCell(0).textContent = user.id;
+                    row.insertCell(1).textContent = user.username;
+                    row.insertCell(2).textContent = user.is_admin ? 'Yes' : 'No';
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Delete';
+                    deleteButton.onclick = () => deleteUser(user.id);
+                    row.insertCell(3).appendChild(deleteButton);
+                });
+            } catch (error) {
+                console.error('Error fetching users:', error);
+            }
+        }
+
+        async function deleteUser(id) {
+            if (confirm('Are you sure you want to delete this user?')) {
+                try {
+                    const response = await fetch(`/users/${id}`, { method: 'DELETE' });
+                    const data = await response.json();
+                    if (data.success) {
+                        alert('User deleted successfully');
+                        fetchUsers();
+                    } else {
+                        alert('Error deleting user');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('An error occurred while deleting the user');
+                }
+            }
+        }
+
+        fetchUsers();
+    </script>
+</body>
+</html>
