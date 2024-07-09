@@ -166,6 +166,19 @@
                 width: 100%;
             }
         }
+        .opacity-control {
+            margin-top: 20px;
+            display: none; /* Hidden by default */
+        }
+
+        .opacity-control label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .opacity-control input[type="range"] {
+            width: 100%;
+        }
     </style>
 </head>
 <body onload="checkAuth(); fetchPatientSessions(); addKeyboardListeners();">
@@ -191,6 +204,10 @@
                             <option value="multiplanar">Multiplanar</option>
                             <option value="render">3D Render</option>
                         </select>
+                    </div>
+                    <div class="opacity-control" id="opacityControl">
+                        <label for="opacitySlider">Mask Opacity:</label>
+                        <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="1">
                     </div>
                 </div>
                 <div class="qc-options" id="qcOptions">
@@ -299,6 +316,9 @@
                 await nv1.loadVolumes(volumes);
                 nv1.setSliceType(nv1.sliceTypeMultiplanar);
                 nv1.updateGLVolume();
+
+                // Show opacity control for LST AI
+                document.getElementById('opacityControl').style.display = qcType === 'LST_AI' ? 'block' : 'none';
             } catch (error) {
                 alert(`Failed to load image files: ${error.message}`);
             }
@@ -307,7 +327,7 @@
         function updateQCOptions() {
             const qcOptionsDiv = document.getElementById('qcOptions');
             qcOptionsDiv.innerHTML = '';
-            const options = qcType === 'LST_AI' ? ['Good', 'Bad'] : ['Ideal image', 'Gadolinium', 'Severe artefacts', 'Incorrect weighting', 'Lreg failure', 'Corrupted image'];
+            const options = qcType === 'LST_AI' ? ['Good', 'Bad'] : ['Ideal image', 'Gadolinium', 'Severe artefacts', 'Incorrect weighting', 'Corrupted image'];
 
             options.forEach(option => {
                 const button = document.createElement('button');
@@ -316,6 +336,12 @@
                 button.onclick = () => logQCOption(option).then(() => loadNext());
                 qcOptionsDiv.appendChild(button);
             });
+
+            // Set default option if no option is already selected
+            if (!document.querySelector('.qc-options .button.selected')) {
+                let defaultOption = qcType === 'LST_AI' ? 'Good' : 'Ideal image';
+                highlightSelectedOption(defaultOption, false);
+            }
         }
 
         async function fetchAndHighlightPreviousQCOption(patient, session, qcType) {
@@ -323,13 +349,16 @@
                 const response = await fetchWithAuth(`/get-qc-log?patient=${patient}&session=${session}&qcType=${qcType}`);
                 const data = await response.json();
                 
-                let optionToHighlight = data.option || null;
+                let optionToHighlight = data.option || (qcType === 'LST_AI' ? 'Good' : 'Ideal image');
                 console.log(`Fetched option: ${optionToHighlight}`);
                 if (optionToHighlight) {
                     highlightSelectedOption(optionToHighlight, false);
                 }
             } catch (error) {
                 console.error("Error fetching QC log:", error);
+                // If there's an error, still set the default based on qcType
+                let defaultOption = qcType === 'LST_AI' ? 'Good' : 'Ideal image';
+                highlightSelectedOption(defaultOption, false);
             }
         }
 
@@ -433,6 +462,14 @@
             }
             nv1.updateGLVolume();
         });
+
+        document.getElementById('opacitySlider').addEventListener('input', function(e) {
+            if (nv1.volumes.length > 1) {
+                nv1.volumes[1].opacity = parseFloat(e.target.value);
+                nv1.updateGLVolume();
+            }
+        });
+
     </script>
 </body>
 </html>
