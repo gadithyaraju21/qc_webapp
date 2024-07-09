@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Imaging QC</title>
+    <link rel="stylesheet" href="common.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="common.js"></script>
+</head>
+<body onload="checkAuth()">
+    <nav class="nav-bar">
+        <ul>
+            <li><a href="filter.html">Home</a></li>
+            <li><a href="database.html">Database</a></li>
+            <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <div class="filter-content">
+            <h1>Medical Imaging QC</h1>
+            <h2>Select QC Type</h2>
+            <p>Choose the type of quality control you want to perform.</p>
+            <div class="button-group">
+                <button class="button" onclick="selectQC('T1')">QC T1 Images</button>
+                <button class="button" onclick="selectQC('FLAIR')">QC FLAIR Images</button>
+                <button class="button" onclick="selectQC('LST_AI')">QC LST AI (FLAIR with masks)</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        function selectQC(qcType) {
+            window.location.href = `qc.html?qcType=${qcType}`;
+        }
+    </script>
+</body>
+</html>

@@ -5,19 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Medical Imaging QC</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="common.css" />
 </head>
 <body>
+    <nav class="nav-bar">
+        <ul>
+            <li><a href="login.html">Login</a></li>
+        </ul>
+    </nav>
     <div class="container">
-        <div class="card" style="max-width: 400px; margin: 100px auto;">
-            <h1 style="text-align: center; margin-bottom: 30px;">Medical Imaging QC</h1>
-            <form id="login-form">
-                <input type="text" id="username" placeholder="Username" required>
-                <input type="password" id="password" placeholder="Password" required>
-                <button type="submit" class="button" style="width: 100%;">Login</button>
-            </form>
-            <p id="error-message" style="color: var(--error-color); text-align: center; margin-top: 20px;"></p>
-        </div>
+        <h1>Medical Imaging QC</h1>
+        <form id="login-form">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit" class="button">Login</button>
+        </form>
+        <p id="error-message"></p>
     </div>
+    <script src="common.js"></script>
     <script>
         document.getElementById('login-form').addEventListener('submit', function(event) {
             event.preventDefault();
