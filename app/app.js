@@ -6,7 +6,7 @@ const { open } = require('sqlite');
 const crypto = require('crypto');
 
 const app = express();
-const port = 2025;
+const port = 3012;
 const niftiDir = '/srv/NFS/ms/data/multms-prospective-ext/derivatives/Lreg_v7.3.2';
 const segmentationDir = '/srv/NFS/ms/data/multms-prospective-ext/derivatives/LST_AI';
 const qcLogDbPath = 'qc_log.db';
@@ -20,6 +20,9 @@ const sessions = {};
 
 // Database initialization
 let db;
+
+// Store valid patients
+let validPatients = [];
 
 async function initDatabase() {
     db = await open({
@@ -38,6 +41,53 @@ async function initDatabase() {
         time TEXT NOT NULL,
         UNIQUE(username, patientID, sessionID, qcType)
     )`);
+}
+
+// Function to scan and filter images
+async function scanAndFilterImages(baseDir) {
+    const patients = await fs.readdir(baseDir);
+    const validPatients = [];
+
+    for (const patient of patients) {
+        if (patient.startsWith('.')) continue;
+
+        const patientDir = path.join(baseDir, patient);
+        const sessions = await fs.readdir(patientDir);
+
+        for (const session of sessions) {
+            if (session.startsWith('.')) continue;
+
+            const anatPath = path.join(patientDir, session, 'anat');
+            try {
+                const files = await fs.readdir(anatPath);
+                const hasT1 = files.some(file => file.includes('_T1'));
+                const hasFLAIR = files.some(file => file.includes('_FLAIR'));
+                
+                if (hasT1 && hasFLAIR) {
+                    const segPath = path.join(segmentationDir, patient, session);
+                    let hasSegmentation = false;
+                    try {
+                        const segFiles = await fs.readdir(segPath);
+                        hasSegmentation = segFiles.some(file => file.endsWith('orig_seg-lst.nii') || file.endsWith('orig_seg-lst.nii.gz'));
+                    } catch (error) {
+                        // Segmentation directory or files not found
+                    }
+
+                    validPatients.push({
+                        patient,
+                        session,
+                        hasT1,
+                        hasFLAIR,
+                        hasSegmentation
+                    });
+                }
+            } catch (error) {
+                console.error(`Error processing anat path for ${patient}/${session}:`, error);
+            }
+        }
+    }
+
+    return validPatients;
 }
 
 // Authentication middleware
@@ -68,81 +118,55 @@ app.post('/login', (req, res) => {
     }
 });
 
+// Update the /patients-sessions endpoint to include file information
+app.get('/patients-sessions', authenticate, (req, res) => {
+    const { qcType } = req.query;
+    let filteredPatients;
 
-app.get('/patients-sessions', authenticate, async (req, res) => {
-    try {
-        const { qcType } = req.query;
-        const patients = await fs.readdir(niftiDir);
-        const patientSessions = [];
-  
-        for (const patient of patients) {
-            if (patient.startsWith('.')) continue;
-  
-            const sessionsPath = path.join(niftiDir, patient);
-            try {
-                const stats = await fs.lstat(sessionsPath);
-                if (stats.isDirectory()) {
-                    const sessions = await fs.readdir(sessionsPath);
-                    for (const session of sessions) {
-                        if (session.startsWith('.')) continue;
-  
-                        const anatPath = path.join(sessionsPath, session, 'anat');
-                        try {
-                            const anatStats = await fs.lstat(anatPath);
-                            if (anatStats.isDirectory()) {
-                                const files = await fs.readdir(anatPath);
-                                const hasT1 = files.some(file => file.includes('_T1'));
-                                const hasFLAIR = files.some(file => file.includes('_FLAIR'));
-                                
-                                if (qcType === 'T1' && hasT1) {
-                                    patientSessions.push({ patient, session });
-                                } else if ((qcType === 'FLAIR' || qcType === 'LST_AI') && hasFLAIR) {
-                                    if (qcType === 'LST_AI') {
-                                        const segPath = path.join(segmentationDir, patient, session);
-                                        try {
-                                            await fs.access(segPath);
-                                            const segFiles = await fs.readdir(segPath);
-                                            if (segFiles.some(file => file.endsWith('orig_seg-lst.nii') || file.endsWith('orig_seg-lst.nii.gz'))) {
-                                                patientSessions.push({ patient, session });
-                                            }
-                                        } catch (error) {
-                                            // Segmentation directory or files not found, skip this session
-                                        }
-                                    } else {
-                                        patientSessions.push({ patient, session });
-                                    }
-                                }
-                            }
-                        } catch (error) {
-                            console.error(`Error processing anat path for ${patient}/${session}:`, error);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error(`Error processing patient path ${patient}:`, error);
-            }
-        }
-  
-        res.json(patientSessions);
-    } catch (error) {
-        console.error('Error in /patients-sessions:', error);
-        res.status(500).json({ error: 'Internal server error' });
+    if (qcType === 'T1') {
+        filteredPatients = validPatients.filter(p => p.hasT1);
+    } else if (qcType === 'FLAIR') {
+        filteredPatients = validPatients.filter(p => p.hasFLAIR);
+    } else if (qcType === 'LST_AI') {
+        filteredPatients = validPatients.filter(p => p.hasFLAIR && p.hasSegmentation);
+    } else {
+        return res.status(400).json({ error: 'Invalid qcType' });
     }
-  });
+
+    res.json(filteredPatients.map(({ patient, session, hasT1, hasFLAIR, hasSegmentation }) => ({ 
+        patient, 
+        session, 
+        hasT1, 
+        hasFLAIR, 
+        hasSegmentation 
+    })));
+});
 
 app.get('/nifti-files/:patient/:session', authenticate, async (req, res) => {
     try {
         const { patient, session } = req.params;
         const { imageType } = req.query;
         const anatPath = path.join(niftiDir, patient, session, 'anat');
+        
+        try {
+            await fs.access(anatPath);
+        } catch (error) {
+            return res.status(404).json({ error: 'Anat directory not found' });
+        }
+
         const files = await fs.readdir(anatPath);
         const niftiFiles = files.filter(file => {
             return (imageType === 'T1' && file.includes('_T1')) || (imageType === 'FLAIR' && file.includes('_FLAIR'));
         });
+
+        if (niftiFiles.length === 0) {
+            return res.status(404).json({ error: `No ${imageType} files found` });
+        }
+
         res.json(niftiFiles);
     } catch (error) {
         console.error('Error in /nifti-files:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Internal server error', details: error.message });
     }
 });
 
@@ -248,13 +272,15 @@ app.get('/logout', (req, res) => {
     } else {
       res.status(400).json({ error: 'No active session' });
     }
-  });
-
+});
 
 // Start the server
 async function startServer() {
     try {
         await initDatabase();
+        validPatients = await scanAndFilterImages(niftiDir);
+        console.log(`Scanned and filtered ${validPatients.length} valid patients.`);
+        
         app.listen(port, () => {
             console.log(`Server running at http://localhost:${port}`);
             console.log(`Serving NIFTI files from directory: ${niftiDir}`);

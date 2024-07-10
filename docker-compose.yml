@@ -1,0 +1,16 @@
+version: '3'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "2030:2020"
+    volumes:
+      - ./qc_webapp:/usr/src/app/qc_webapp
+      - /srv/NFS/ms/data/multms-prospective-ext:/srv/NFS/ms/data/multms-prospective-ext
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    working_dir: /usr/src/app/qc_webapp
+    command: node app.js

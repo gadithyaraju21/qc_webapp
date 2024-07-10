@@ -15,6 +15,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@niivue/niivue@0.38.0/dist/niivue.umd.js"></script>
     <script src="common.js"></script>
     
+    <!-- Module imports -->
+    <script type="module">
+        import ImageBuffer from './imageBuffer.js';
+        window.ImageBuffer = ImageBuffer; // Make it available globally
+    </script>
+    
     <style>
         body, html {
             margin: 0;
@@ -87,19 +93,19 @@
             gap: 0.5rem;
         }
         .qc-options button {
-            transition: all 0.2s ease;
+            transition: all 0.1s ease;
         }
         .qc-options button.selected {
             background-color: var(--success-color);
             box-shadow: 0 0 10px rgba(52, 199, 89, 0.5);
-            transform: scale(1.05);
+            transform: scale(1.03);
         }
         @keyframes quickPulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.03); }
         }
         .qc-options button.animate {
-            animation: quickPulse 0.2s ease;
+            animation: quickPulse 0.1s ease;
         }
         .modal {
             display: none;
@@ -157,6 +163,16 @@
             min-width: 20px;
             text-align: center;
         }
+        .opacity-control {
+            margin-top: 20px;
+        }
+        .opacity-control label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .opacity-control input[type="range"] {
+            width: 100%;
+        }
         @media (max-width: 768px) {
             .content-container {
                 flex-direction: column;
@@ -166,22 +182,9 @@
                 width: 100%;
             }
         }
-        .opacity-control {
-            margin-top: 20px;
-            display: none; /* Hidden by default */
-        }
-
-        .opacity-control label {
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        .opacity-control input[type="range"] {
-            width: 100%;
-        }
     </style>
 </head>
-<body onload="checkAuth(); fetchPatientSessions(); addKeyboardListeners();">
+<body onload="checkAuth(); initializeApp();">
     <div class="page-container">
         <nav class="nav-bar">
             <ul>
@@ -205,7 +208,7 @@
                             <option value="render">3D Render</option>
                         </select>
                     </div>
-                    <div class="opacity-control" id="opacityControl">
+                    <div class="opacity-control" id="opacityControl" style="display: none;">
                         <label for="opacitySlider">Mask Opacity:</label>
                         <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="1">
                     </div>
@@ -237,19 +240,34 @@
     </div>
 
     <script>
-        const nv1 = new niivue.Niivue({
-            isResizeCanvas: true,
-            dragAndDropEnabled: true,
-            sliceType: niivue.SLICE_TYPE.MULTIPLANAR,
-            backColor: [0, 0, 0, 1],
-            crosshairColor: [1, 0, 0, 0.8],
-            isRadiologicalConvention: true,
-        });
-        nv1.attachTo("gl");
-
+        let nv1, imageBuffer;
         let patientSessions = [];
         let currentIndex = 0;
+        const sessionId = localStorage.getItem('sessionId');
         const qcType = new URLSearchParams(window.location.search).get('qcType') || 'T1';
+        let isLoading = false;
+
+        async function initializeApp() {
+            try {
+                initializeNiivue();
+                await fetchPatientSessions();
+                addKeyboardListeners();
+            } catch (error) {
+                console.error("Failed to initialize app:", error);
+                alert(`Failed to initialize app: ${error.message}`);
+            }
+        }
+
+        function initializeNiivue() {
+            nv1 = new niivue.Niivue({
+                isResizeCanvas: true,
+                dragAndDropEnabled: true,
+                sliceType: niivue.SLICE_TYPE.MULTIPLANAR,
+                backColor: [0, 0, 0, 1],
+                crosshairColor: [1, 0, 0, 0.8],
+            });
+            nv1.attachTo("gl");
+        }
 
         async function fetchPatientSessions() {
             try {
@@ -257,44 +275,16 @@
                 const data = await response.json();
                 if (data.length > 0) {
                     patientSessions = data;
+                    imageBuffer = new ImageBuffer(10, sessionId);
+                    await imageBuffer.initialize(patientSessions, qcType);
                     await loadPatientSession(currentIndex);
                     updateQCOptions();
                 } else {
                     alert("No patient sessions found. Please check the server configuration.");
                 }
             } catch (error) {
+                console.error("Failed to fetch patient sessions:", error);
                 alert(`Failed to fetch patient sessions: ${error.message}`);
-            }
-        }
-
-        async function loadPatientSession(index) {
-            const { patient, session } = patientSessions[index];
-            document.getElementById("patient-info").textContent = `Patient: ${patient} | Session: ${session}`;
-
-            try {
-                const imageType = qcType === 'LST_AI' ? 'FLAIR' : qcType;
-                const niftiResponse = await fetchWithAuth(`/nifti-files/${patient}/${session}?imageType=${imageType}`);
-                const niftiFiles = await niftiResponse.json();
-
-                if (niftiFiles.length > 0) {
-                    if (qcType === 'LST_AI') {
-                        const segmentationResponse = await fetchWithAuth(`/segmentation-files/${patient}/${session}`);
-                        const segmentationFiles = await segmentationResponse.json();
-                        if (segmentationFiles.length > 0) {
-                            await loadFiles(patient, session, niftiFiles[0], segmentationFiles[0]);
-                        } else {
-                            alert("No segmentation files found for this patient session.");
-                        }
-                    } else {
-                        await loadFiles(patient, session, niftiFiles[0]);
-                    }
-                    updateQCOptions();
-                    setTimeout(() => fetchAndHighlightPreviousQCOption(patient, session, qcType), 100);
-                } else {
-                    alert("No files found for this patient session.");
-                }
-            } catch (error) {
-                alert(`Failed to load patient session: ${error.message}`);
             }
         }
 
@@ -316,11 +306,36 @@
                 await nv1.loadVolumes(volumes);
                 nv1.setSliceType(nv1.sliceTypeMultiplanar);
                 nv1.updateGLVolume();
-
-                // Show opacity control for LST AI
-                document.getElementById('opacityControl').style.display = qcType === 'LST_AI' ? 'block' : 'none';
             } catch (error) {
                 alert(`Failed to load image files: ${error.message}`);
+            }
+        }
+
+        async function loadPatientSession(index) {
+            try {
+                if (index < 0 || index >= patientSessions.length) {
+                    throw new Error("Invalid patient session index");
+                }
+
+                const { patient, session } = patientSessions[index];
+                document.getElementById("patient-info").textContent = `Patient: ${patient} | Session: ${session}`;
+
+                const volumes = await imageBuffer.getImage(index);
+                if (volumes && volumes.length > 0) {
+                    await nv1.loadVolumes(volumes);
+                    nv1.setSliceType(nv1.sliceTypeMultiplanar);
+                    nv1.updateGLVolume();
+
+                    document.getElementById('opacityControl').style.display = qcType === 'LST_AI' ? 'block' : 'none';
+
+                    updateQCOptions();
+                    await fetchAndHighlightPreviousQCOption(patient, session, qcType);
+                } else {
+                    throw new Error("No files found for this patient session");
+                }
+            } catch (error) {
+                console.error("Failed to load patient session:", error);
+                alert(`Failed to load patient session: ${error.message}`);
             }
         }
 
@@ -379,6 +394,9 @@
         }
 
         async function logQCOption(option) {
+            if (isLoading) return;
+            isLoading = true;
+            
             const { patient, session } = patientSessions[currentIndex];
             highlightSelectedOption(option, true);
 
@@ -400,27 +418,62 @@
                     throw new Error('Failed to log QC option');
                 }
                 console.log(`QC option logged: ${option}`);
+                await loadNext();
             } catch (error) {
                 console.error('Error logging QC option:', error);
                 alert(`Failed to log QC option: ${error.message}`);
+            } finally {
+                isLoading = false;
             }
         }
 
-        function loadNext() {
-            currentIndex = (currentIndex + 1) % patientSessions.length;
-            loadPatientSession(currentIndex);
+        async function loadNext() {
+            if (isLoading) return;
+            isLoading = true;
+
+            try {
+                if (!imageBuffer) {
+                    throw new Error("Image loading system not initialized");
+                }
+
+                await imageBuffer.moveNext();
+                currentIndex = imageBuffer.currentIndex;
+                await loadPatientSession(currentIndex);
+            } catch (error) {
+                console.error("Failed to load next image:", error);
+                alert(`Failed to load next image: ${error.message}`);
+            } finally {
+                isLoading = false;
+            }
         }
 
-        function loadPrevious() {
-            currentIndex = (currentIndex - 1 + patientSessions.length) % patientSessions.length;
-            loadPatientSession(currentIndex);
+        async function loadPrevious() {
+            if (isLoading) return;
+            isLoading = true;
+
+            try {
+                if (!imageBuffer) {
+                    throw new Error("Image loading system not initialized");
+                }
+
+                await imageBuffer.movePrevious();
+                currentIndex = imageBuffer.currentIndex;
+                await loadPatientSession(currentIndex);
+            } catch (error) {
+                console.error("Failed to load previous image:", error);
+                alert(`Failed to load previous image: ${error.message}`);
+            } finally {
+                isLoading = false;
+            }
         }
 
         function addKeyboardListeners() {
-            document.addEventListener('keydown', (e) => {
+            document.addEventListener('keydown', async (e) => {
+                if (isLoading) return;
+                
                 switch(e.key) {
-                    case 'ArrowLeft': loadPrevious(); break;
-                    case 'ArrowRight': loadNext(); break;
+                    case 'ArrowLeft': await loadPrevious(); break;
+                    case 'ArrowRight': await loadNext(); break;
                     case 'ArrowUp':
                     case 'ArrowDown':
                         const buttons = document.querySelectorAll('.qc-options .button');
@@ -433,12 +486,13 @@
                     case 'Enter':
                         const selectedOption = document.querySelector('.qc-options .button.selected');
                         if (selectedOption) {
-                            logQCOption(selectedOption.textContent).then(() => loadNext());
+                            await logQCOption(selectedOption.textContent);
                         }
                         break;
                 }
             });
         }
+
         function openModal() {
             document.getElementById('infoModal').style.display = 'block';
         }
@@ -469,7 +523,6 @@
                 nv1.updateGLVolume();
             }
         });
-
     </script>
 </body>
 </html>
