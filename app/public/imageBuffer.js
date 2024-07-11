@@ -1,13 +1,12 @@
 class ImageBuffer {
     constructor(bufferSize = 10, sessionId, workerCount = 4) {
         this.bufferSize = bufferSize;
-        this.buffer = new Map();
+        this.buffer = new WeakMap();
         this.loadQueue = [];
         this.currentIndex = 0;
         this.sessionId = sessionId;
         this.workerCount = workerCount;
         this.preloadWorkers = [];
-        this.niftiParserWorker = new Worker('nifti-parser-worker.js');
         this.activeTasks = 0;
 
         // Create multiple preload workers
@@ -16,8 +15,6 @@ class ImageBuffer {
             worker.onmessage = this.handlePreloadMessage.bind(this);
             this.preloadWorkers.push(worker);
         }
-
-        this.niftiParserWorker.onmessage = this.handleNiftiParseMessage.bind(this);
     }
 
     async initialize(patientSessions, qcType) {
@@ -27,12 +24,17 @@ class ImageBuffer {
     }
 
     async fillBuffer() {
-        const endIndex = Math.min(this.currentIndex + this.bufferSize, this.patientSessions.length);
-        for (let i = this.currentIndex; i < endIndex; i++) {
-            if (!this.buffer.has(i) && !this.loadQueue.includes(i)) {
+        const centerIndex = this.currentIndex;
+        const start = Math.max(centerIndex - 2, 0);
+        const end = Math.min(centerIndex + 3, this.patientSessions.length);
+
+        for (let i = start; i < end; i++) {
+            const patient = this.patientSessions[i];
+            if (!this.buffer.has(patient)) {
                 this.loadQueue.push(i);
             }
         }
+
         this.processQueue();
     }
 
@@ -60,40 +62,15 @@ class ImageBuffer {
         if (error) {
             console.error(`Preload error for index ${index}:`, error);
         } else {
-            this.sendToParser(volumes, index);
+            this.buffer.set(this.patientSessions[index], volumes);
         }
         this.processQueue(); // Continue processing the queue
     }
 
-    sendToParser(volumes, index) {
-        volumes.forEach(volume => {
-            this.niftiParserWorker.postMessage({
-                data: volume.data,
-                filename: volume.name,
-                index: index
-            }, [volume.data]);
-        });
-        
-        this.buffer.set(index, volumes.map(v => ({...v, data: null})));
-    }
-
-    handleNiftiParseMessage(e) {
-        const { error, parsedData, index, filename } = e.data;
-        if (error) {
-            console.error(`NIFTI parse error for index ${index}:`, error);
-        } else {
-            const volumes = this.buffer.get(index);
-            const volumeIndex = volumes.findIndex(v => v.name === filename);
-            if (volumeIndex !== -1) {
-                volumes[volumeIndex].parsedData = parsedData;
-                this.buffer.set(index, volumes);
-            }
-        }
-    }
-
     async getImage(index) {
-        if (this.buffer.has(index)) {
-            return this.buffer.get(index);
+        const patient = this.patientSessions[index];
+        if (this.buffer.has(patient)) {
+            return this.buffer.get(patient);
         }
         return this.loadImage(index);
     }
@@ -128,13 +105,13 @@ class ImageBuffer {
     }
 
     async updateBuffer() {
-        const minIndex = this.currentIndex - Math.floor(this.bufferSize / 2);
-        const maxIndex = this.currentIndex + Math.floor(this.bufferSize / 2);
-        
-        for (const [index, volumes] of this.buffer) {
-            if (index < minIndex || index > maxIndex) {
-                volumes.forEach(vol => URL.revokeObjectURL(vol.url));
-                this.buffer.delete(index);
+        this.bufferHead = Math.max(this.currentIndex - 2, 0);
+        this.bufferTail = Math.min(this.currentIndex + 3, this.patientSessions.length);
+
+        // Remove old entries from the buffer
+        for (let i = this.bufferHead; i < this.bufferTail; i++) {
+            if (!this.buffer.has(this.patientSessions[i])) {
+                this.buffer.delete(this.patientSessions[i]);
             }
         }
 

@@ -6,7 +6,7 @@ const { open } = require('sqlite');
 const crypto = require('crypto');
 
 const app = express();
-const port = 3012;
+const port = 2022;
 const niftiDir = '/srv/NFS/ms/data/multms-prospective-ext/derivatives/Lreg_v7.3.2';
 const segmentationDir = '/srv/NFS/ms/data/multms-prospective-ext/derivatives/LST_AI';
 const qcLogDbPath = 'qc_log.db';

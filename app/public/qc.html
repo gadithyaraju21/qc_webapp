@@ -238,7 +238,6 @@
             </div>
         </div>
     </div>
-
     <script>
         let nv1, imageBuffer;
         let patientSessions = [];
@@ -246,17 +245,28 @@
         const sessionId = localStorage.getItem('sessionId');
         const qcType = new URLSearchParams(window.location.search).get('qcType') || 'T1';
         let isLoading = false;
+        let selectedOption = null;
 
         async function initializeApp() {
-            try {
-                initializeNiivue();
-                await fetchPatientSessions();
+        try {
+            initializeNiivue();
+            imageBuffer = new ImageBuffer(10, sessionId);
+            const response = await fetchWithAuth(`/patients-sessions?qcType=${qcType}`);
+            const data = await response.json();
+            if (data.length > 0) {
+                patientSessions = data;
+                await imageBuffer.initialize(patientSessions, qcType);
+                await loadPatientSession(currentIndex);
+                updateQCOptions();
                 addKeyboardListeners();
-            } catch (error) {
-                console.error("Failed to initialize app:", error);
-                alert(`Failed to initialize app: ${error.message}`);
+            } else {
+                alert("No patient sessions found. Please check the server configuration.");
             }
+        } catch (error) {
+            console.error("Failed to initialize app:", error);
+            alert(`Failed to initialize app: ${error.message}`);
         }
+    }
 
         function initializeNiivue() {
             nv1 = new niivue.Niivue({
@@ -265,50 +275,9 @@
                 sliceType: niivue.SLICE_TYPE.MULTIPLANAR,
                 backColor: [0, 0, 0, 1],
                 crosshairColor: [1, 0, 0, 0.8],
+                isRadiologicalConvention: true,
             });
             nv1.attachTo("gl");
-        }
-
-        async function fetchPatientSessions() {
-            try {
-                const response = await fetchWithAuth(`/patients-sessions?qcType=${qcType}`);
-                const data = await response.json();
-                if (data.length > 0) {
-                    patientSessions = data;
-                    imageBuffer = new ImageBuffer(10, sessionId);
-                    await imageBuffer.initialize(patientSessions, qcType);
-                    await loadPatientSession(currentIndex);
-                    updateQCOptions();
-                } else {
-                    alert("No patient sessions found. Please check the server configuration.");
-                }
-            } catch (error) {
-                console.error("Failed to fetch patient sessions:", error);
-                alert(`Failed to fetch patient sessions: ${error.message}`);
-            }
-        }
-
-        async function loadFiles(patient, session, niftiFile, segmentationFile = null) {
-            try {
-                const niftiResponse = await fetchWithAuth(`/nifti/${patient}/${session}/${niftiFile}`);
-                const niftiBlob = await niftiResponse.blob();
-                const niftiUrl = URL.createObjectURL(niftiBlob);
-
-                const volumes = [{ url: niftiUrl, name: niftiFile, colormap: "gray", opacity: 1 }];
-
-                if (segmentationFile) {
-                    const segmentationResponse = await fetchWithAuth(`/segmentation/${patient}/${session}/${segmentationFile}`);
-                    const segmentationBlob = await segmentationResponse.blob();
-                    const segmentationUrl = URL.createObjectURL(segmentationBlob);
-                    volumes.push({ url: segmentationUrl, name: segmentationFile, colormap: "red", opacity: 1.0 });
-                }
-
-                await nv1.loadVolumes(volumes);
-                nv1.setSliceType(nv1.sliceTypeMultiplanar);
-                nv1.updateGLVolume();
-            } catch (error) {
-                alert(`Failed to load image files: ${error.message}`);
-            }
         }
 
         async function loadPatientSession(index) {
@@ -327,8 +296,6 @@
                     nv1.updateGLVolume();
 
                     document.getElementById('opacityControl').style.display = qcType === 'LST_AI' ? 'block' : 'none';
-
-                    updateQCOptions();
                     await fetchAndHighlightPreviousQCOption(patient, session, qcType);
                 } else {
                     throw new Error("No files found for this patient session");
@@ -339,54 +306,29 @@
             }
         }
 
-        function updateQCOptions() {
-            const qcOptionsDiv = document.getElementById('qcOptions');
-            qcOptionsDiv.innerHTML = '';
-            const options = qcType === 'LST_AI' ? ['Good', 'Bad'] : ['Ideal image', 'Gadolinium', 'Severe artefacts', 'Incorrect weighting', 'Corrupted image'];
-
-            options.forEach(option => {
-                const button = document.createElement('button');
-                button.textContent = option;
-                button.className = `button ${qcType === 'LST_AI' ? option.toLowerCase() + '-button' : ''}`;
-                button.onclick = () => logQCOption(option).then(() => loadNext());
-                qcOptionsDiv.appendChild(button);
-            });
-
-            // Set default option if no option is already selected
-            if (!document.querySelector('.qc-options .button.selected')) {
-                let defaultOption = qcType === 'LST_AI' ? 'Good' : 'Ideal image';
-                highlightSelectedOption(defaultOption, false);
-            }
-        }
-
         async function fetchAndHighlightPreviousQCOption(patient, session, qcType) {
             try {
                 const response = await fetchWithAuth(`/get-qc-log?patient=${patient}&session=${session}&qcType=${qcType}`);
                 const data = await response.json();
-                
-                let optionToHighlight = data.option || (qcType === 'LST_AI' ? 'Good' : 'Ideal image');
-                console.log(`Fetched option: ${optionToHighlight}`);
-                if (optionToHighlight) {
-                    highlightSelectedOption(optionToHighlight, false);
-                }
+                selectedOption = data.option || (qcType === 'LST_AI' ? 'Good' : 'Ideal image');
+                highlightSelectedOption(selectedOption, false);
             } catch (error) {
                 console.error("Error fetching QC log:", error);
-                // If there's an error, still set the default based on qcType
-                let defaultOption = qcType === 'LST_AI' ? 'Good' : 'Ideal image';
-                highlightSelectedOption(defaultOption, false);
+                selectedOption = qcType === 'LST_AI' ? 'Good' : 'Ideal image';
+                highlightSelectedOption(selectedOption, false);
             }
         }
 
         function highlightSelectedOption(option, animate = true) {
-            console.log(`Attempting to highlight option: ${option}`);
-            document.querySelectorAll('.qc-options .button').forEach(button => {
+            console.log(`Highlighting option: ${option}`);
+            const buttons = document.querySelectorAll('.qc-options .button');
+            buttons.forEach(button => {
                 if (button.textContent === option) {
                     button.classList.add('selected');
                     if (animate) {
                         button.classList.add('animate');
                         setTimeout(() => button.classList.remove('animate'), 200);
                     }
-                    console.log(`Option highlighted: ${option}`);
                 } else {
                     button.classList.remove('selected', 'animate');
                 }
@@ -394,9 +336,6 @@
         }
 
         async function logQCOption(option) {
-            if (isLoading) return;
-            isLoading = true;
-            
             const { patient, session } = patientSessions[currentIndex];
             highlightSelectedOption(option, true);
 
@@ -418,12 +357,9 @@
                     throw new Error('Failed to log QC option');
                 }
                 console.log(`QC option logged: ${option}`);
-                await loadNext();
             } catch (error) {
                 console.error('Error logging QC option:', error);
                 alert(`Failed to log QC option: ${error.message}`);
-            } finally {
-                isLoading = false;
             }
         }
 
@@ -468,12 +404,10 @@
         }
 
         function addKeyboardListeners() {
-            document.addEventListener('keydown', async (e) => {
-                if (isLoading) return;
-                
+            document.addEventListener('keydown', (e) => {
                 switch(e.key) {
-                    case 'ArrowLeft': await loadPrevious(); break;
-                    case 'ArrowRight': await loadNext(); break;
+                    case 'ArrowLeft': loadPrevious(); break;
+                    case 'ArrowRight': loadNext(); break;
                     case 'ArrowUp':
                     case 'ArrowDown':
                         const buttons = document.querySelectorAll('.qc-options .button');
@@ -486,11 +420,32 @@
                     case 'Enter':
                         const selectedOption = document.querySelector('.qc-options .button.selected');
                         if (selectedOption) {
-                            await logQCOption(selectedOption.textContent);
+                            logQCOption(selectedOption.textContent).then(() => loadNext());
                         }
                         break;
                 }
             });
+        }
+
+        function updateQCOptions() {
+            const qcOptionsDiv = document.getElementById('qcOptions');
+            qcOptionsDiv.innerHTML = '';
+            const options = qcType === 'LST_AI' ? ['Good', 'Bad'] : ['Ideal image', 'Gadolinium', 'Severe artefacts', 'Incorrect weighting', 'Corrupted image'];
+
+            options.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.className = `button ${qcType === 'LST_AI' ? option.toLowerCase() + '-button' : ''}`;
+                button.onclick = async () => {
+                    selectedOption = option;
+                    highlightSelectedOption(selectedOption, true);
+                    await logQCOption(selectedOption);
+                    await loadNext();
+                };
+                qcOptionsDiv.appendChild(button);
+            });
+
+            highlightSelectedOption(selectedOption || (qcType === 'LST_AI' ? 'Good' : 'Ideal image'), false);
         }
 
         function openModal() {
@@ -501,7 +456,6 @@
             document.getElementById('infoModal').style.display = 'none';
         }
 
-        // Close the modal if the user clicks outside of it
         window.onclick = function(event) {
             if (event.target == document.getElementById('infoModal')) {
                 closeModal();
@@ -523,6 +477,6 @@
                 nv1.updateGLVolume();
             }
         });
-    </script>
+</script>
 </body>
 </html>
