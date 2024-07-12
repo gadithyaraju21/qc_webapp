@@ -17,8 +17,8 @@
     
     <!-- Module imports -->
     <script type="module">
-        import ImageBuffer from './imageBuffer.js';
-        window.ImageBuffer = ImageBuffer; // Make it available globally
+        import NiivueBuffer from './NiivueBuffer.js';
+        window.NiivueBuffer = NiivueBuffer;
     </script>
     
     <style>
@@ -239,48 +239,61 @@
         </div>
     </div>
     <script>
-        let nv1, imageBuffer;
+        let nv, niivueBuffer;
         let patientSessions = [];
         let currentIndex = 0;
         const sessionId = localStorage.getItem('sessionId');
         const qcType = new URLSearchParams(window.location.search).get('qcType') || 'T1';
         let isLoading = false;
-        let selectedOption = null;
 
         async function initializeApp() {
-        try {
-            initializeNiivue();
-            imageBuffer = new ImageBuffer(10, sessionId);
-            const response = await fetchWithAuth(`/patients-sessions?qcType=${qcType}`);
-            const data = await response.json();
-            if (data.length > 0) {
-                patientSessions = data;
-                await imageBuffer.initialize(patientSessions, qcType);
-                await loadPatientSession(currentIndex);
-                updateQCOptions();
+            try {
+                console.log('Initializing app...');
+                initializeNiivue();
+                await fetchPatientSessions();
                 addKeyboardListeners();
-            } else {
-                alert("No patient sessions found. Please check the server configuration.");
+                console.log('App initialization complete.');
+            } catch (error) {
+                console.error("Failed to initialize app:", error);
+                alert(`Failed to initialize app: ${error.message}`);
             }
-        } catch (error) {
-            console.error("Failed to initialize app:", error);
-            alert(`Failed to initialize app: ${error.message}`);
         }
-    }
 
         function initializeNiivue() {
-            nv1 = new niivue.Niivue({
+            console.log('Initializing Niivue...');
+            nv = new niivue.Niivue({
                 isResizeCanvas: true,
                 dragAndDropEnabled: true,
                 sliceType: niivue.SLICE_TYPE.MULTIPLANAR,
                 backColor: [0, 0, 0, 1],
                 crosshairColor: [1, 0, 0, 0.8],
-                isRadiologicalConvention: true,
             });
-            nv1.attachTo("gl");
+            nv.attachTo("gl");
+            console.log('Niivue initialized.');
+        }
+
+        async function fetchPatientSessions() {
+            console.log('Fetching patient sessions...');
+            try {
+                const response = await fetchWithAuth(`/patients-sessions?qcType=${qcType}`);
+                const data = await response.json();
+                if (data.length > 0) {
+                    patientSessions = data;
+                    console.log(`Fetched ${patientSessions.length} patient sessions.`);
+                    niivueBuffer = new NiivueBuffer(10, sessionId);
+                    await niivueBuffer.initialize(patientSessions, qcType);
+                    await loadPatientSession(currentIndex);
+                } else {
+                    throw new Error("No patient sessions found. Please check the server configuration.");
+                }
+            } catch (error) {
+                console.error("Failed to fetch patient sessions:", error);
+                alert(`Failed to fetch patient sessions: ${error.message}`);
+            }
         }
 
         async function loadPatientSession(index) {
+            // console.log(`Loading patient session for index: ${index}`);
             try {
                 if (index < 0 || index >= patientSessions.length) {
                     throw new Error("Invalid patient session index");
@@ -289,20 +302,44 @@
                 const { patient, session } = patientSessions[index];
                 document.getElementById("patient-info").textContent = `Patient: ${patient} | Session: ${session}`;
 
-                const volumes = await imageBuffer.getImage(index);
+                const volumes = await niivueBuffer.getImage(index);
                 if (volumes && volumes.length > 0) {
-                    await nv1.loadVolumes(volumes);
-                    nv1.setSliceType(nv1.sliceTypeMultiplanar);
-                    nv1.updateGLVolume();
-
+                    console.log(`Loaded ${volumes.length} volumes for index ${index}`);
+                    await nv.loadVolumes(volumes);
+                    nv.setSliceType(nv.sliceTypeMultiplanar);
+                    nv.updateGLVolume();
                     document.getElementById('opacityControl').style.display = qcType === 'LST_AI' ? 'block' : 'none';
+                    updateQCOptions();
                     await fetchAndHighlightPreviousQCOption(patient, session, qcType);
                 } else {
-                    throw new Error("No files found for this patient session");
+                    throw new Error("No image data found for this patient session");
                 }
             } catch (error) {
                 console.error("Failed to load patient session:", error);
                 alert(`Failed to load patient session: ${error.message}`);
+                // Try to load the next session if this one fails
+                await loadNext();
+            }
+        }
+
+
+        function updateQCOptions() {
+            const qcOptionsDiv = document.getElementById('qcOptions');
+            qcOptionsDiv.innerHTML = '';
+            const options = qcType === 'LST_AI' ? ['Good', 'Bad'] : ['Ideal image', 'Gadolinium', 'Severe artefacts', 'Incorrect weighting', 'Corrupted image'];
+
+            options.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.className = `button ${qcType === 'LST_AI' ? option.toLowerCase() + '-button' : ''}`;
+                button.onclick = () => logQCOption(option).then(() => loadNext());
+                qcOptionsDiv.appendChild(button);
+            });
+
+            // Set default option if no option is already selected
+            if (!document.querySelector('.qc-options .button.selected')) {
+                let defaultOption = qcType === 'LST_AI' ? 'Good' : 'Ideal image';
+                highlightSelectedOption(defaultOption, false);
             }
         }
 
@@ -320,7 +357,7 @@
         }
 
         function highlightSelectedOption(option, animate = true) {
-            console.log(`Highlighting option: ${option}`);
+            // console.log(`Highlighting option: ${option}`);
             const buttons = document.querySelectorAll('.qc-options .button');
             buttons.forEach(button => {
                 if (button.textContent === option) {
@@ -368,12 +405,12 @@
             isLoading = true;
 
             try {
-                if (!imageBuffer) {
+                // console.log('Loading next image...');
+                if (!niivueBuffer) {
                     throw new Error("Image loading system not initialized");
                 }
 
-                await imageBuffer.moveNext();
-                currentIndex = imageBuffer.currentIndex;
+                currentIndex = await niivueBuffer.moveNext();
                 await loadPatientSession(currentIndex);
             } catch (error) {
                 console.error("Failed to load next image:", error);
@@ -388,12 +425,12 @@
             isLoading = true;
 
             try {
-                if (!imageBuffer) {
+                // console.log('Loading previous image...');
+                if (!niivueBuffer) {
                     throw new Error("Image loading system not initialized");
                 }
 
-                await imageBuffer.movePrevious();
-                currentIndex = imageBuffer.currentIndex;
+                currentIndex = await niivueBuffer.movePrevious();
                 await loadPatientSession(currentIndex);
             } catch (error) {
                 console.error("Failed to load previous image:", error);
@@ -427,26 +464,6 @@
             });
         }
 
-        function updateQCOptions() {
-            const qcOptionsDiv = document.getElementById('qcOptions');
-            qcOptionsDiv.innerHTML = '';
-            const options = qcType === 'LST_AI' ? ['Good', 'Bad'] : ['Ideal image', 'Gadolinium', 'Severe artefacts', 'Incorrect weighting', 'Corrupted image'];
-
-            options.forEach(option => {
-                const button = document.createElement('button');
-                button.textContent = option;
-                button.className = `button ${qcType === 'LST_AI' ? option.toLowerCase() + '-button' : ''}`;
-                button.onclick = async () => {
-                    selectedOption = option;
-                    highlightSelectedOption(selectedOption, true);
-                    await logQCOption(selectedOption);
-                    await loadNext();
-                };
-                qcOptionsDiv.appendChild(button);
-            });
-
-            highlightSelectedOption(selectedOption || (qcType === 'LST_AI' ? 'Good' : 'Ideal image'), false);
-        }
 
         function openModal() {
             document.getElementById('infoModal').style.display = 'block';
