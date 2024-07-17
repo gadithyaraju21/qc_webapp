@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Medical Imaging QC</title>
+    <link rel="stylesheet" href="common.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container admin-container">
+        <h1>Admin Panel</h1>
+        <div class="user-form">
+            <h2>Add User</h2>
+            <form id="addUserForm">
+                <input type="text" id="newUsername" placeholder="Username" required>
+                <input type="password" id="newPassword" placeholder="Password" required>
+                <button type="submit" class="button">Add User</button>
+            </form>
+            <div id="addUserFeedback"></div>
+        </div>
+        <div class="user-list">
+            <h2>User List</h2>
+            <div id="userListFeedback"></div>
+            <table id="userTable">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- User list will be populated here -->
+                </tbody>
+            </table>
+        </div>
+        <button id="logoutButton" class="button">Logout</button>
+    </div>
+    <script src="common.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>

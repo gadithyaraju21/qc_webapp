@@ -5,12 +5,12 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "2030:2020"
+      - "8005:8005"
     volumes:
-      - ./qc_webapp:/usr/src/app/qc_webapp
-      - /srv/NFS/ms/data/multms-prospective-ext:/srv/NFS/ms/data/multms-prospective-ext
+      - ./app:/usr/src/app/
+      - /srv/NFS/ms/data/multms-prospective-ext/derivatives:/srv/NFS/ms/data/multms-prospective-ext/derivatives
     environment:
       - NODE_ENV=production
     restart: unless-stopped
-    working_dir: /usr/src/app/qc_webapp
+    working_dir: /usr/src/app
     command: node app.js

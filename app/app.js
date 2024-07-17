@@ -6,7 +6,7 @@ const { open } = require('sqlite');
 const crypto = require('crypto');
 
 const app = express();
-const port = 2051;
+const port = 8005;
 const niftiDir = '/srv/NFS/ms/data/multms-prospective-ext/derivatives/Lreg_v7.3.2';
 const segmentationDir = '/srv/NFS/ms/data/multms-prospective-ext/derivatives/LST_AI';
 const qcLogDbPath = 'qc_log.db';
@@ -23,6 +23,10 @@ let db;
 
 // Store valid patients
 let validPatients = [];
+
+function hashPassword(password) {
+    return crypto.createHash('sha256').update(password).digest('hex');
+}
 
 async function initDatabase() {
     db = await open({
@@ -41,7 +45,51 @@ async function initDatabase() {
         time TEXT NOT NULL,
         UNIQUE(username, patientID, sessionID, qcType)
     )`);
+
+    await db.exec(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        isAdmin INTEGER DEFAULT 0
+    )`);
+
+    const adminUsername = 'admin';
+    const adminPassword = 'password123';
+
+    const adminExists = await db.get('SELECT * FROM users WHERE username = ? AND isAdmin = 1', [adminUsername]);
+    if (!adminExists) {
+        const hashedPassword = hashPassword(adminPassword);
+        await db.run('INSERT INTO users (username, password, isAdmin) VALUES (?, ?, 1)', [adminUsername, hashedPassword]);
+        console.log('Admin user created successfully');
+    } else {
+        console.log('Admin user already exists');
+    }
 }
+
+// Authentication middleware
+const authenticate = (req, res, next) => {
+    const sessionId = req.headers['x-session-id'];
+    if (sessions[sessionId]) {
+        req.username = sessions[sessionId].username;
+        req.isAdmin = sessions[sessionId].isAdmin;
+        next();
+    } else {
+        res.status(401).json({ error: 'Unauthorized' });
+    }
+};
+
+// Admin authentication middleware
+const requireAdminAuth = (req, res, next) => {
+    if (req.isAdmin) {
+        next();
+    } else {
+        res.status(403).json({ error: 'Admin access required' });
+    }
+};
+
+app.get('/user-info', authenticate, (req, res) => {
+    res.json({ username: req.username, isAdmin: req.isAdmin });
+});
 
 // Function to scan and filter images
 async function scanAndFilterImages(baseDir) {
@@ -90,35 +138,40 @@ async function scanAndFilterImages(baseDir) {
     return validPatients;
 }
 
-// Authentication middleware
-const authenticate = (req, res, next) => {
-    const sessionId = req.headers['x-session-id'];
-    if (sessions[sessionId]) {
-        req.username = sessions[sessionId];
-        next();
-    } else {
-        res.status(401).json({ error: 'Unauthorized' });
-    }
-};
 
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-    // In a real application, you would validate against a database
-    if (username === 'admin' && password === 'password123') {
+app.post('/login', async (req, res) => {
+    const { username, password, isAdmin } = req.body;
+    console.log(`Login attempt: username=${username}, isAdmin=${isAdmin}`);
+
+    try {
+        const user = await db.get('SELECT * FROM users WHERE username = ?', [username]);
+        console.log('User found:', user ? 'Yes' : 'No');
+
+        if (!user || user.password !== hashPassword(password)) {
+            console.log('Invalid credentials');
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        if (isAdmin && !user.isAdmin) {
+            console.log('Not authorized as admin');
+            return res.status(403).json({ error: 'Not authorized as admin' });
+        }
+
+        console.log('Login successful');
         const sessionId = crypto.randomBytes(16).toString('hex');
-        sessions[sessionId] = username;
-        res.json({ sessionId });
-    } else {
-        res.status(401).json({ error: 'Invalid credentials' });
+        sessions[sessionId] = { username: user.username, isAdmin: user.isAdmin };
+        res.json({ sessionId, isAdmin: user.isAdmin });
+    } catch (error) {
+        console.error('Error during login:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-// Update the /patients-sessions endpoint to include file information
 app.get('/patients-sessions', authenticate, (req, res) => {
     const { qcType } = req.query;
     let filteredPatients;
@@ -231,14 +284,49 @@ app.post('/log-qc', authenticate, async (req, res) => {
     }
 });
 
-app.post('/export-csv', authenticate, async (req, res) => {
-    const { filter } = req.body;
+// Update the database route to handle user-specific access
+app.get('/database', authenticate, async (req, res) => {
+    const { filter } = req.query;
     try {
         let query = `SELECT username, patientID, sessionID, qcType, option, date, time FROM qc_log`;
-        if (filter) {
-            query += ` WHERE qcType = ?`;
+        const params = [];
+
+        if (!req.isAdmin) {
+            query += ` WHERE username = ?`;
+            params.push(req.username);
         }
-        const rows = await db.all(query, filter ? [filter] : []);
+
+        if (filter) {
+            query += params.length ? ` AND qcType = ?` : ` WHERE qcType = ?`;
+            params.push(filter);
+        }
+
+        const rows = await db.all(query, params);
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching database content:', error.message);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Update the export-csv route to handle user-specific access
+app.post('/export-csv', authenticate, async (req, res) => {
+    const { filter } = req.query;
+    try {
+        let query = `SELECT username, patientID, sessionID, qcType, option, date, time FROM qc_log`;
+        const params = [];
+
+        if (!req.isAdmin) {
+            query += ` WHERE username = ?`;
+            params.push(req.username);
+        }
+
+        if (filter) {
+            query += params.length ? ` AND qcType = ?` : ` WHERE qcType = ?`;
+            params.push(filter);
+        }
+
+        const rows = await db.all(query, params);
         
         const csvContent = [
             'username,patientID,sessionID,qcType,option,date,time',
@@ -254,23 +342,65 @@ app.post('/export-csv', authenticate, async (req, res) => {
     }
 });
 
-app.get('/database', authenticate, async (req, res) => {
+app.get('/logout', (req, res) => {
+    const sessionId = req.headers['x-session-id'];
+    if (sessionId && sessions[sessionId]) {
+        delete sessions[sessionId];
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ error: 'No active session' });
+    }
+});
+
+app.get('/admin/check-auth', authenticate, (req, res) => {
+    if (req.isAdmin) {
+        res.sendStatus(200);
+    } else {
+        res.sendStatus(401);
+    }
+});
+
+app.post('/admin/addUser', authenticate, requireAdminAuth, async (req, res) => {
+    const { username, password } = req.body;
+
     try {
-        const rows = await db.all(`SELECT username, patientID, sessionID, option, qcType, date, time FROM qc_log`);
-        res.json(rows);
+        const existingUser = await db.get('SELECT * FROM users WHERE username = ?', [username]);
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+
+        const hashedPassword = hashPassword(password);
+        await db.run('INSERT INTO users (username, password, isAdmin) VALUES (?, ?, 0)', [username, hashedPassword]);
+        res.status(201).json({ message: 'User added successfully' });
     } catch (error) {
-        console.error('Error fetching database content:', error.message);
+        console.error('Error adding user:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-app.get('/logout', (req, res) => {
-    const sessionId = req.headers['x-session-id'];
-    if (sessionId && sessions[sessionId]) {
-      delete sessions[sessionId];
-      res.json({ success: true });
-    } else {
-      res.status(400).json({ error: 'No active session' });
+app.get('/admin/users', authenticate, requireAdminAuth, async (req, res) => {
+    try {
+        const users = await db.all('SELECT username FROM users WHERE isAdmin = 0');
+        res.json(users);
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.delete('/admin/deleteUser/:username', authenticate, requireAdminAuth, async (req, res) => {
+    const username = req.params.username;
+
+    try {
+        const result = await db.run('DELETE FROM users WHERE username = ? AND isAdmin = 0', [username]);
+        if (result.changes > 0) {
+            res.json({ message: 'User deleted successfully' });
+        } else {
+            res.status(404).json({ error: 'User not found or cannot be deleted' });
+        }
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 

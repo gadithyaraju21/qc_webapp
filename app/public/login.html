@@ -8,11 +8,6 @@
     <link rel="stylesheet" href="common.css" />
 </head>
 <body>
-    <nav class="nav-bar">
-        <ul>
-            <li><a href="login.html">Login</a></li>
-        </ul>
-    </nav>
     <div class="container">
         <h1>Medical Imaging QC</h1>
         <form id="login-form">
@@ -21,35 +16,10 @@
             <button type="submit" class="button">Login</button>
         </form>
         <p id="error-message"></p>
+        <hr>
+        <a href="admin.html">Admin Login</a>
     </div>
     <script src="common.js"></script>
-    <script>
-        document.getElementById('login-form').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            fetch('/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.sessionId) {
-                    localStorage.setItem('sessionId', data.sessionId);
-                    window.location.href = 'filter.html';
-                } else {
-                    document.getElementById('error-message').textContent = 'Invalid credentials';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('error-message').textContent = 'An error occurred during login';
-            });
-        });
-    </script>
+    <script src="login.js"></script>
 </body>
 </html>

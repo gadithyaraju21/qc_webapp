@@ -152,3 +152,18 @@
       width: 100%;
   }
 }
+
+/* Admin Page Styles */
+.admin-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.user-form, .user-list {
+  margin-bottom: 2rem;
+}
+
+.user-form input, .user-form select {
+  margin-bottom: 0.5rem;
+}

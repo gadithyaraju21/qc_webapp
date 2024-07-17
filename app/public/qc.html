@@ -238,6 +238,51 @@
             </div>
         </div>
     </div>
+    <div id="status-screen" class="status-screen">
+        <div class="status-content">
+          <h2>Initializing QC Application</h2>
+          <p id="status-message">Loading patient data...</p>
+          <div class="loader"></div>
+        </div>
+      </div>
+      
+      <style>
+      .status-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+      }
+      
+      .status-content {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 10px;
+        text-align: center;
+      }
+      
+      .loader {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin: 20px auto 0;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      </style>
+    </div>
     <script>
         let nv, niivueBuffer;
         let patientSessions = [];
@@ -246,17 +291,37 @@
         const qcType = new URLSearchParams(window.location.search).get('qcType') || 'T1';
         let isLoading = false;
 
+        function showStatusScreen() {
+            document.getElementById('status-screen').style.display = 'flex';
+        }
+
+        function hideStatusScreen() {
+            document.getElementById('status-screen').style.display = 'none';
+        }
+
+        function updateStatusMessage(message) {
+            document.getElementById('status-message').textContent = message;
+        }
+
+
         async function initializeApp() {
+            showStatusScreen();
             try {
                 console.log('Initializing app...');
+                updateStatusMessage('Initializing app...');
                 initializeNiivue();
+                updateStatusMessage('Fetching patient data...');
                 await fetchPatientSessions();
-                addKeyboardListeners();
+                updateStatusMessage('Setting up UI...');
+                await addKeyboardListeners();
                 console.log('App initialization complete.');
+                updateStatusMessage('Initialization complete...')
             } catch (error) {
                 console.error("Failed to initialize app:", error);
                 alert(`Failed to initialize app: ${error.message}`);
             }
+            hideStatusScreen();
+
         }
 
         function initializeNiivue() {

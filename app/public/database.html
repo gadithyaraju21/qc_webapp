@@ -1,110 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Database Viewer - Medical Imaging QC</title>
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="common.css" />
-  <script src="common.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QC Log Database Viewer - Medical Imaging QC</title>
+    <link rel="stylesheet" href="common.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body onload="checkAuth(); fetchData();">
-  <nav class="nav-bar">
-    <ul>
-      <li><a href="filter.html">Home</a></li>
-      <li><a href="database.html">Database</a></li>
-      <li><a href="#" onclick="logout()">Logout</a></li>
-    </ul>
-  </nav>
-  <div class="container">
-    <h1>QC Log Database Viewer</h1>
-    <div class="filter-buttons">
-      <button class="button" onclick="filterData('T1')">Filter T1</button>
-      <button class="button" onclick="filterData('FLAIR')">Filter FLAIR</button>
-      <button class="button" onclick="filterData('LST_AI')">Filter LST AI</button>
-      <button class="button secondary" onclick="resetFilter()">Reset Filter</button>
-      <button class="button" onclick="exportCSV()">Export Filtered Data as CSV</button>
+<body>
+    <nav class="nav-bar">
+        <ul>
+            <li><a href="filter.html">Home</a></li>
+            <li><a href="database.html">Database</a></li>
+            <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h1>QC Log Database Viewer</h1>
+        <div id="userInfo"></div>
+        <div class="filter-buttons">
+            <button id="filterT1">Filter T1</button>
+            <button id="filterFLAIR">Filter FLAIR</button>
+            <button id="filterLST_AI">Filter LST AI</button>
+            <button id="resetFilter">Reset Filter</button>
+            <button id="exportCSV">Export Filtered Data as CSV</button>
+        </div>
+        <table id="qcLogTable">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Patient ID</th>
+                    <th>Session ID</th>
+                    <th>QC Type</th>
+                    <th>Option</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- QC log data will be populated here -->
+            </tbody>
+        </table>
     </div>
-    <table id="data-table">
-      <thead>
-        <tr>
-          <th>USERNAME</th>
-          <th>PATIENT ID</th>
-          <th>SESSION ID</th>
-          <th>QC TYPE</th>
-          <th>OPTION</th>
-          <th>DATE</th>
-          <th>TIME</th>
-        </tr>
-      </thead>
-      <tbody id="data-table-body">
-        <!-- Data will be inserted here -->
-      </tbody>
-    </table>
-  </div>
-  <script>
-    let currentFilter = '';
-
-    function fetchData() {
-      fetchWithAuth('/database')
-        .then(response => response.json())
-        .then(data => {
-          displayData(data);
-        })
-        .catch(error => console.error('Error fetching data:', error));
-    }
-
-    function displayData(data) {
-      const tableBody = document.getElementById('data-table-body');
-      tableBody.innerHTML = '';
-      data.forEach(row => {
-        if (!currentFilter || row.qcType === currentFilter) {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${row.username}</td>
-            <td>${row.patientID}</td>
-            <td>${row.sessionID}</td>
-            <td>${row.qcType}</td>
-            <td>${row.option}</td>
-            <td>${row.date}</td>
-            <td>${row.time}</td>
-          `;
-          tableBody.appendChild(tr);
-        }
-      });
-    }
-
-    function filterData(qcType) {
-      currentFilter = qcType;
-      fetchData();
-    }
-
-    function resetFilter() {
-      currentFilter = '';
-      fetchData();
-    }
-
-    function exportCSV() {
-      fetchWithAuth('/export-csv', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ filter: currentFilter })
-      })
-      .then(response => response.blob())
-      .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = 'exported_qc_log.csv';
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-      })
-      .catch(error => console.error('Error exporting CSV:', error));
-    }
-  </script>
+    <script src="common.js"></script>
+    <script src="database.js"></script>
 </body>
 </html>

@@ -52,3 +52,24 @@ async function fetchWithAuth(url, options = {}) {
         throw error;
     }
 }
+
+
+async function checkAdminAuth() {
+    const sessionId = localStorage.getItem('sessionId');
+    if (!sessionId) {
+        window.location.href = '/admin-login.html';  
+        return;
+    }
+
+    try {
+        const response = await fetchWithAuth('/admin/check-auth');
+        if (response.status === 401) {
+            window.location.href = '/admin-login.html';
+            return;
+        }
+    } catch (error) {
+        console.error('Error checking admin auth:', error);
+        window.location.href = '/admin-login.html';
+    }
+}
+

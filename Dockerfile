@@ -2,16 +2,16 @@
 FROM node:14
 
 # Set the working directory in the container
-WORKDIR /usr/src/app/qc_webapp
+WORKDIR /usr/src/app/
 
 # Copy package.json and package-lock.json
-COPY qc_webapp/package*.json ./
+COPY package*.json ./
 
 # Install dependencies
 RUN npm install
 
 # Copy the rest of the application code
-COPY qc_webapp .
+COPY app .
 
 # List contents of the app directory (for debugging)
 RUN ls -la
