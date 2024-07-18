@@ -187,12 +187,15 @@
 <body onload="checkAuth(); initializeApp();">
     <div class="page-container">
         <nav class="nav-bar">
-            <ul>
-                <li><a href="filter.html">Home</a></li>
-                <li><a href="database.html">Database</a></li>
-                <li><a href="#" onclick="logout()">Logout</a></li>
-                <li><i class="fas fa-info-circle info-icon" onclick="openModal()" title="How to use this page"></i></li>
-            </ul>
+            <div class="nav-links">
+                <a href="filter.html">Home</a>
+                <a href="database.html">Database</a>
+            </div>
+            <div class="user-status">
+                <div class="status-icon"></div>
+                <span id="userStatus">Logged in as: </span>
+                <a href="#" onclick="logout()">Logout</a>
+            </div>
         </nav>
         <div class="content-container">
             <div class="image-panel">
@@ -546,17 +549,17 @@
 
         document.getElementById('viewMode').addEventListener('change', (e) => {
             if (e.target.value === 'multiplanar') {
-                nv1.setSliceType(nv1.sliceTypeMultiplanar);
+                nv.setSliceType(nv.sliceTypeMultiplanar);
             } else {
-                nv1.setSliceType(nv1.sliceTypeRender);
+                nv.setSliceType(nv.sliceTypeRender);
             }
-            nv1.updateGLVolume();
+            nv.updateGLVolume();
         });
 
         document.getElementById('opacitySlider').addEventListener('input', function(e) {
-            if (nv1.volumes.length > 1) {
-                nv1.volumes[1].opacity = parseFloat(e.target.value);
-                nv1.updateGLVolume();
+            if (nv.volumes.length > 1) {
+                nv.volumes[1].opacity = parseFloat(e.target.value);
+                nv.updateGLVolume();
             }
         });
 </script>

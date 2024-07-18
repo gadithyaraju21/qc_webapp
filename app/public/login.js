@@ -17,6 +17,7 @@ async function login(event) {
         
         if (response.ok) {
             localStorage.setItem('sessionId', data.sessionId);
+            localStorage.setItem('isAdmin', data.isAdmin);
             window.location.href = '/filter.html';  // Redirect to the main application page after successful login
         } else {
             errorMessage.textContent = data.error || 'Invalid username or password';

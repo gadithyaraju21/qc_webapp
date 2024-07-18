@@ -3,28 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QC Log Database Viewer - Medical Imaging QC</title>
+    <title>QC Log Database Viewer</title>
     <link rel="stylesheet" href="common.css">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="database.css">
 </head>
 <body>
     <nav class="nav-bar">
-        <ul>
-            <li><a href="filter.html">Home</a></li>
-            <li><a href="database.html">Database</a></li>
-            <li><a href="#" onclick="logout()">Logout</a></li>
-        </ul>
+        <div class="nav-links">
+            <a href="filter.html">Home</a>
+            <a href="database.html">Database</a>
+        </div>
+        <div class="user-status">
+            <div class="status-icon"></div>
+            <span id="userStatus">Logged in as: </span>
+            <a href="#" onclick="logout()">Logout</a>
+        </div>
     </nav>
     <div class="container">
         <h1>QC Log Database Viewer</h1>
-        <div id="userInfo"></div>
+        
         <div class="filter-buttons">
-            <button id="filterT1">Filter T1</button>
-            <button id="filterFLAIR">Filter FLAIR</button>
-            <button id="filterLST_AI">Filter LST AI</button>
-            <button id="resetFilter">Reset Filter</button>
-            <button id="exportCSV">Export Filtered Data as CSV</button>
+            <button id="filterT1" class="button">Filter T1</button>
+            <button id="filterFLAIR" class="button">Filter FLAIR</button>
+            <button id="filterLST_AI" class="button">Filter LST AI</button>
+            <button id="resetFilter" class="button">Reset Filter</button>
+            <button id="exportCSV" class="button">Export Filtered Data as CSV</button>
         </div>
+
+        <div id="adminControls" style="display: none;">
+            <select id="userFilter">
+                <option value="">All Users</option>
+            </select>
+            <button id="applyUserFilter" class="button">Filter by User</button>
+            <button id="deleteAllUserEntries" class="button danger">Delete All Entries for Selected User</button>
+        </div>
+
         <table id="qcLogTable">
             <thead>
                 <tr>
@@ -35,13 +48,14 @@
                     <th>Option</th>
                     <th>Date</th>
                     <th>Time</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- QC log data will be populated here -->
             </tbody>
         </table>
     </div>
+
     <script src="common.js"></script>
     <script src="database.js"></script>
 </body>

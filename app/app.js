@@ -164,8 +164,8 @@ app.post('/login', async (req, res) => {
 
         console.log('Login successful');
         const sessionId = crypto.randomBytes(16).toString('hex');
-        sessions[sessionId] = { username: user.username, isAdmin: user.isAdmin };
-        res.json({ sessionId, isAdmin: user.isAdmin });
+        sessions[sessionId] = { username: user.username, isAdmin: user.isAdmin == 1 };
+        res.json({ sessionId, isAdmin: user.isAdmin==1 });
     } catch (error) {
         console.error('Error during login:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -284,9 +284,9 @@ app.post('/log-qc', authenticate, async (req, res) => {
     }
 });
 
-// Update the database route to handle user-specific access
+// Update the database route to handle user-specific access and user filtering
 app.get('/database', authenticate, async (req, res) => {
-    const { filter } = req.query;
+    const { filter, userFilter } = req.query;
     try {
         let query = `SELECT username, patientID, sessionID, qcType, option, date, time FROM qc_log`;
         const params = [];
@@ -294,6 +294,9 @@ app.get('/database', authenticate, async (req, res) => {
         if (!req.isAdmin) {
             query += ` WHERE username = ?`;
             params.push(req.username);
+        } else if (userFilter) {
+            query += ` WHERE username = ?`;
+            params.push(userFilter);
         }
 
         if (filter) {
@@ -309,9 +312,9 @@ app.get('/database', authenticate, async (req, res) => {
     }
 });
 
-// Update the export-csv route to handle user-specific access
+// Update the export-csv route to handle user-specific access and user filtering
 app.post('/export-csv', authenticate, async (req, res) => {
-    const { filter } = req.query;
+    const { filter, userFilter } = req.query;
     try {
         let query = `SELECT username, patientID, sessionID, qcType, option, date, time FROM qc_log`;
         const params = [];
@@ -319,6 +322,9 @@ app.post('/export-csv', authenticate, async (req, res) => {
         if (!req.isAdmin) {
             query += ` WHERE username = ?`;
             params.push(req.username);
+        } else if (userFilter) {
+            query += ` WHERE username = ?`;
+            params.push(userFilter);
         }
 
         if (filter) {
@@ -380,7 +386,7 @@ app.post('/admin/addUser', authenticate, requireAdminAuth, async (req, res) => {
 
 app.get('/admin/users', authenticate, requireAdminAuth, async (req, res) => {
     try {
-        const users = await db.all('SELECT username FROM users WHERE isAdmin = 0');
+        const users = await db.all('SELECT username, isAdmin FROM users');
         res.json(users);
     } catch (error) {
         console.error('Error fetching users:', error);
@@ -400,6 +406,43 @@ app.delete('/admin/deleteUser/:username', authenticate, requireAdminAuth, async 
         }
     } catch (error) {
         console.error('Error deleting user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Add a new route for deleting entries
+app.delete('/admin/deleteEntry', authenticate, requireAdminAuth, async (req, res) => {
+    const { username, patientID, sessionID, qcType } = req.body;
+
+    try {
+        const result = await db.run('DELETE FROM qc_log WHERE username = ? AND patientID = ? AND sessionID = ? AND qcType = ?', 
+            [username, patientID, sessionID, qcType]);
+        
+        if (result.changes > 0) {
+            res.json({ message: 'Entry deleted successfully' });
+        } else {
+            res.status(404).json({ error: 'Entry not found' });
+        }
+    } catch (error) {
+        console.error('Error deleting entry:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Add a new route for deleting all entries for a user
+app.delete('/admin/deleteAllUserEntries', authenticate, requireAdminAuth, async (req, res) => {
+    const { username } = req.body;
+
+    try {
+        const result = await db.run('DELETE FROM qc_log WHERE username = ?', [username]);
+        
+        if (result.changes > 0) {
+            res.json({ message: `All entries for user "${username}" deleted successfully` });
+        } else {
+            res.status(404).json({ error: 'No entries found for the specified user' });
+        }
+    } catch (error) {
+        console.error('Error deleting user entries:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

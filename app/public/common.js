@@ -1,9 +1,36 @@
 // common.js
 
-function checkAuth() {
+async function checkAuth() {
     const sessionId = localStorage.getItem('sessionId');
     if (!sessionId) {
-        window.location.href = '/login.html';  // Changed from '/login' to '/login.html'
+        window.location.href = '/login.html';
+        return null;
+    }
+    
+    try {
+        const response = await fetchWithAuth('/user-info');
+        const userInfo = await response.json();
+        setUserStatus(userInfo.username, userInfo.isAdmin);
+        return userInfo;
+    } catch (error) {
+        console.error('Error checking auth:', error);
+        localStorage.removeItem('sessionId');
+        localStorage.removeItem('isAdmin');
+        window.location.href = '/login.html';
+        return null;
+    }
+}
+
+function setUserStatus(username, isAdmin) {
+    const userStatusElement = document.getElementById('userStatus');
+    if (userStatusElement) {
+        userStatusElement.textContent = `Logged in as: ${username}`;
+        if (isAdmin) {
+            const adminBadge = document.createElement('span');
+            adminBadge.textContent = ' (Admin)';
+            adminBadge.className = 'status-admin';
+            userStatusElement.appendChild(adminBadge);
+        }
     }
 }
 

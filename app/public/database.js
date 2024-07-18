@@ -1,18 +1,39 @@
 let currentFilter = '';
 let isAdmin = false;
+let currentUserFilter = '';
 
 document.addEventListener('DOMContentLoaded', async function() {
     const userInfo = await checkAuth();
     if (userInfo) {
         isAdmin = userInfo.isAdmin;
-        document.getElementById('userInfo').textContent = `Logged in as: ${userInfo.username}${isAdmin ? ' (Admin)' : ''}`;
+        if (isAdmin) {
+            document.getElementById('adminControls').style.display = 'block';
+            await populateUserFilter();
+        }
         fetchQCLogs();
     }
 });
 
+async function populateUserFilter() {
+    try {
+        const response = await fetchWithAuth('/admin/users');
+        const users = await response.json();
+        const userFilter = document.getElementById('userFilter');
+        userFilter.innerHTML = '<option value="">All Users</option>';
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.username;
+            option.textContent = user.username + (user.isAdmin ? ' (Admin)' : '');
+            userFilter.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error fetching users:', error);
+    }
+}
+
 async function fetchQCLogs() {
     try {
-        const response = await fetchWithAuth(`/database?filter=${currentFilter}`);
+        const response = await fetchWithAuth(`/database?filter=${currentFilter}&userFilter=${currentUserFilter}`);
         const qcLogs = await response.json();
         displayQCLogs(qcLogs);
     } catch (error) {
@@ -35,6 +56,7 @@ function displayQCLogs(qcLogs) {
             <td>${log.option}</td>
             <td>${log.date}</td>
             <td>${log.time}</td>
+            <td>${isAdmin ? `<button class="button danger" onclick="deleteEntry('${log.username}', '${log.patientID}', '${log.sessionID}', '${log.qcType}')">Delete</button>` : ''}</td>
         `;
         tableBody.appendChild(row);
     });
@@ -47,12 +69,14 @@ function filterQCType(qcType) {
 
 function resetFilter() {
     currentFilter = '';
+    currentUserFilter = '';
+    document.getElementById('userFilter').value = '';
     fetchQCLogs();
 }
 
 async function exportCSV() {
     try {
-        const response = await fetchWithAuth(`/export-csv?filter=${currentFilter}`, {
+        const response = await fetchWithAuth(`/export-csv?filter=${currentFilter}&userFilter=${currentUserFilter}`, {
             method: 'POST'
         });
         const blob = await response.blob();
@@ -70,8 +94,65 @@ async function exportCSV() {
     }
 }
 
+async function deleteEntry(username, patientID, sessionID, qcType) {
+    if (confirm(`Are you sure you want to delete this entry?\nUsername: ${username}\nPatient ID: ${patientID}\nSession ID: ${sessionID}\nQC Type: ${qcType}`)) {
+        try {
+            const response = await fetchWithAuth('/admin/deleteEntry', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, patientID, sessionID, qcType }),
+            });
+            if (response.ok) {
+                alert('Entry deleted successfully');
+                fetchQCLogs();
+            } else {
+                alert('Failed to delete entry. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error deleting entry:', error);
+            alert('An error occurred while deleting the entry. Please try again.');
+        }
+    }
+}
+
+async function deleteAllUserEntries() {
+    const selectedUser = document.getElementById('userFilter').value;
+    if (!selectedUser) {
+        alert('Please select a user first.');
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to delete ALL entries for user "${selectedUser}"? This action cannot be undone.`)) {
+        try {
+            const response = await fetchWithAuth('/admin/deleteAllUserEntries', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username: selectedUser }),
+            });
+            if (response.ok) {
+                alert(`All entries for user "${selectedUser}" have been deleted successfully.`);
+                fetchQCLogs();
+            } else {
+                alert('Failed to delete user entries. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error deleting user entries:', error);
+            alert('An error occurred while deleting user entries. Please try again.');
+        }
+    }
+}
+
 document.getElementById('filterT1').addEventListener('click', () => filterQCType('T1'));
 document.getElementById('filterFLAIR').addEventListener('click', () => filterQCType('FLAIR'));
 document.getElementById('filterLST_AI').addEventListener('click', () => filterQCType('LST_AI'));
 document.getElementById('resetFilter').addEventListener('click', resetFilter);
 document.getElementById('exportCSV').addEventListener('click', exportCSV);
+document.getElementById('applyUserFilter').addEventListener('click', () => {
+    currentUserFilter = document.getElementById('userFilter').value;
+    fetchQCLogs();
+});
+document.getElementById('deleteAllUserEntries').addEventListener('click', deleteAllUserEntries);

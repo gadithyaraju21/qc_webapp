@@ -10,11 +10,15 @@
 </head>
 <body onload="checkAuth()">
     <nav class="nav-bar">
-        <ul>
-            <li><a href="filter.html">Home</a></li>
-            <li><a href="database.html">Database</a></li>
-            <li><a href="#" onclick="logout()">Logout</a></li>
-        </ul>
+        <div class="nav-links">
+            <a href="filter.html">Home</a>
+            <a href="database.html">Database</a>
+        </div>
+        <div class="user-status">
+            <div class="status-icon"></div>
+            <span id="userStatus">Logged in as: </span>
+            <a href="#" onclick="logout()">Logout</a>
+        </div>
     </nav>
     <div class="container">
         <div class="filter-content">

@@ -41,9 +41,11 @@
 }
 
 /* QC Page Styles */
+/* qc.css */
+
 .qc-container {
   display: flex;
-  height: calc(100vh - 50px); /* Adjust for nav bar */
+  height: calc(100vh - 60px); /* Adjust for nav bar height */
 }
 
 .image-panel {
@@ -55,7 +57,7 @@
   flex: 1;
   max-width: 300px;
   padding: 1rem;
-  background-color: #f8f8f8;
+  background-color: #ffffff;
   box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
   overflow-y: auto;
   display: flex;
