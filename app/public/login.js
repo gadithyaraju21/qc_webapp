@@ -1,4 +1,4 @@
-document.getElementById('login-form').addEventListener('submit', login);
+document.getElementById('loginForm').addEventListener('submit', login);
 
 async function login(event) {
     event.preventDefault();
@@ -18,12 +18,12 @@ async function login(event) {
         if (response.ok) {
             localStorage.setItem('sessionId', data.sessionId);
             localStorage.setItem('isAdmin', data.isAdmin);
-            window.location.href = '/filter.html';  // Redirect to the main application page after successful login
+            window.location.href = '/filter.html';
         } else {
-            errorMessage.textContent = data.error || 'Invalid username or password';
+            errorMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${data.error || 'Invalid username or password'}`;
         }
     } catch (error) {
         console.error('Error during login:', error);
-        errorMessage.textContent = 'An error occurred during login. Please try again.';
+        errorMessage.innerHTML = '<i class="fas fa-exclamation-triangle"></i> An error occurred during login. Please try again.';
     }
 }

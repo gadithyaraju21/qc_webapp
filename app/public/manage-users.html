@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Users - Medical Imaging QC</title>
+    <link rel="stylesheet" href="common.css">
+    <script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <nav class="nav-bar">
+        <ul>
+            <li><a href="filter.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="database.html"><i class="fas fa-database"></i> Database</a></li>
+            <li class="admin-only"><a href="manage-users.html"><i class="fas fa-users-cog"></i> Manage Users</a></li>
+            <li><a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+            <li id="userStatus"><i class="fas fa-user"></i> </li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <h1><i class="fas fa-users-cog"></i> Manage Users</h1>
+        
+        <div id="addUserForm">
+            <h2><i class="fas fa-user-plus"></i> Add New User</h2>
+            <form>
+                <input type="text" id="newUsername" placeholder="Username" required>
+                <input type="password" id="newPassword" placeholder="Password" required>
+                <label for="newUserIsAdmin">
+                    <input type="checkbox" id="newUserIsAdmin"> Admin
+                </label>
+                <button type="submit"><i class="fas fa-plus-circle"></i> Add User</button>
+            </form>
+            <p id="addUserFeedback"></p>
+        </div>
+
+        <div id="userList">
+            <h2><i class="fas fa-list"></i> User List</h2>
+            <table id="userTable">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- User list will be populated by JavaScript -->
+                </tbody>
+            </table>
+            <p id="userListFeedback"></p>
+        </div>
+    </div>
+
+    <div id="userModal" class="modal">
+        <div id="userModalContent" class="modal-content">
+            <!-- Modal content will be populated by JavaScript -->
+        </div>
+        <p id="modalFeedback"></p>
+    </div>
+
+    <script src="common.js"></script>
+    <script src="manage-users.js"></script>
+</body>
+</html>

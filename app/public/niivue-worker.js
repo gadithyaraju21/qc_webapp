@@ -1,17 +1,12 @@
-// data-fetch-worker.js
+// niivue-worker.js
 console.log('Data fetch worker initialized');
-
-self.onerror = function(error) {
-    console.error('Worker global error:', error);
-    self.postMessage({ action: 'error', error: error.message });
-};
 
 self.onmessage = async function(e) {
     const { action, patient, session, imageType, qcType, index, sessionId } = e.data;
     
     if (action === 'preload') {
         try {
-            // console.log(`Worker: Preloading data for patient ${patient}, session ${session}, index ${index}`);
+            console.log(`Worker: Preloading data for patient ${patient}, session ${session}, index ${index}`);
             const headers = { 'X-Session-Id': sessionId };
             const niftiResponse = await fetch(`/nifti-files/${patient}/${session}?imageType=${imageType}`, { headers });
             
@@ -38,7 +33,7 @@ self.onmessage = async function(e) {
                     }
                 }
 
-                // console.log(`Worker: Preload complete for index ${index}`);
+                console.log(`Worker: Preload complete for index ${index}`);
                 self.postMessage({ action: 'preloadComplete', index, imageData: volumes });
             } else {
                 throw new Error("No NIFTI files found");

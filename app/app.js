@@ -359,15 +359,19 @@ app.get('/logout', (req, res) => {
 });
 
 app.get('/admin/check-auth', authenticate, (req, res) => {
+    console.log('Admin check-auth request received');
+    console.log('User:', req.username, 'isAdmin:', req.isAdmin);
     if (req.isAdmin) {
+        console.log('Admin check successful');
         res.sendStatus(200);
     } else {
-        res.sendStatus(401);
+        console.log('Admin check failed - not an admin');
+        res.status(403).json({ error: 'Admin access required' });
     }
 });
 
 app.post('/admin/addUser', authenticate, requireAdminAuth, async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, isAdmin } = req.body;
 
     try {
         const existingUser = await db.get('SELECT * FROM users WHERE username = ?', [username]);
@@ -376,10 +380,66 @@ app.post('/admin/addUser', authenticate, requireAdminAuth, async (req, res) => {
         }
 
         const hashedPassword = hashPassword(password);
-        await db.run('INSERT INTO users (username, password, isAdmin) VALUES (?, ?, 0)', [username, hashedPassword]);
+        await db.run('INSERT INTO users (username, password, isAdmin) VALUES (?, ?, ?)', [username, hashedPassword, isAdmin ? 1 : 0]);
         res.status(201).json({ message: 'User added successfully' });
     } catch (error) {
         console.error('Error adding user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/admin/resetPassword/:username', authenticate, requireAdminAuth, async (req, res) => {
+    const username = req.params.username;
+    const tempPassword = crypto.randomBytes(8).toString('hex');
+    const hashedPassword = hashPassword(tempPassword);
+
+    try {
+        const result = await db.run('UPDATE users SET password = ? WHERE username = ?', [hashedPassword, username]);
+        if (result.changes > 0) {
+            res.json({ message: 'Password reset successfully', tempPassword });
+        } else {
+            res.status(404).json({ error: 'User not found' });
+        }
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.put('/admin/editUser/:username', authenticate, requireAdminAuth, async (req, res) => {
+    const username = req.params.username;
+    const { newUsername, isAdmin } = req.body;
+
+    try {
+        if (newUsername && newUsername !== username) {
+            const existingUser = await db.get('SELECT * FROM users WHERE username = ?', [newUsername]);
+            if (existingUser) {
+                return res.status(400).json({ error: 'New username already exists' });
+            }
+        }
+
+        let query = 'UPDATE users SET';
+        const params = [];
+        if (newUsername) {
+            query += ' username = ?,';
+            params.push(newUsername);
+        }
+        if (isAdmin !== undefined) {
+            query += ' isAdmin = ?,';
+            params.push(isAdmin ? 1 : 0);
+        }
+        query = query.slice(0, -1); // Remove the last comma
+        query += ' WHERE username = ?';
+        params.push(username);
+
+        const result = await db.run(query, params);
+        if (result.changes > 0) {
+            res.json({ message: 'User updated successfully' });
+        } else {
+            res.status(404).json({ error: 'User not found' });
+        }
+    } catch (error) {
+        console.error('Error updating user:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -443,6 +503,21 @@ app.delete('/admin/deleteAllUserEntries', authenticate, requireAdminAuth, async 
         }
     } catch (error) {
         console.error('Error deleting user entries:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/admin/users/:username', authenticate, requireAdminAuth, async (req, res) => {
+    const username = req.params.username;
+    try {
+        const user = await db.get('SELECT username, isAdmin FROM users WHERE username = ?', [username]);
+        if (user) {
+            res.json(user);
+        } else {
+            res.status(404).json({ error: 'User not found' });
+        }
+    } catch (error) {
+        console.error('Error fetching user details:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

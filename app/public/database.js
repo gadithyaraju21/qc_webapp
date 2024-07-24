@@ -1,12 +1,7 @@
-let currentFilter = '';
-let isAdmin = false;
-let currentUserFilter = '';
-
 document.addEventListener('DOMContentLoaded', async function() {
     const userInfo = await checkAuth();
     if (userInfo) {
-        isAdmin = userInfo.isAdmin;
-        if (isAdmin) {
+        if (isAdmin()) {
             document.getElementById('adminControls').style.display = 'block';
             await populateUserFilter();
         }
@@ -14,22 +9,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 });
 
-async function populateUserFilter() {
-    try {
-        const response = await fetchWithAuth('/admin/users');
-        const users = await response.json();
-        const userFilter = document.getElementById('userFilter');
-        userFilter.innerHTML = '<option value="">All Users</option>';
-        users.forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.username;
-            option.textContent = user.username + (user.isAdmin ? ' (Admin)' : '');
-            userFilter.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error fetching users:', error);
-    }
-}
+let currentFilter = '';
+let currentUserFilter = '';
 
 async function fetchQCLogs() {
     try {
@@ -56,7 +37,7 @@ function displayQCLogs(qcLogs) {
             <td>${log.option}</td>
             <td>${log.date}</td>
             <td>${log.time}</td>
-            <td>${isAdmin ? `<button class="button danger" onclick="deleteEntry('${log.username}', '${log.patientID}', '${log.sessionID}', '${log.qcType}')">Delete</button>` : ''}</td>
+            ${isAdmin() ? `<td><button class="button danger" onclick="deleteEntry('${log.username}', '${log.patientID}', '${log.sessionID}', '${log.qcType}')"><i class="fas fa-trash-alt"></i> Delete</button></td>` : ''}
         `;
         tableBody.appendChild(row);
     });
@@ -117,6 +98,28 @@ async function deleteEntry(username, patientID, sessionID, qcType) {
     }
 }
 
+async function populateUserFilter() {
+    try {
+        const response = await fetchWithAuth('/admin/users');
+        const users = await response.json();
+        const userFilter = document.getElementById('userFilter');
+        userFilter.innerHTML = '<option value="">All Users</option>';
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.username;
+            option.textContent = user.username + (user.isAdmin ? ' (Admin)' : '');
+            userFilter.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error fetching users:', error);
+    }
+}
+
+function applyUserFilter() {
+    currentUserFilter = document.getElementById('userFilter').value;
+    fetchQCLogs();
+}
+
 async function deleteAllUserEntries() {
     const selectedUser = document.getElementById('userFilter').value;
     if (!selectedUser) {
@@ -145,14 +148,3 @@ async function deleteAllUserEntries() {
         }
     }
 }
-
-document.getElementById('filterT1').addEventListener('click', () => filterQCType('T1'));
-document.getElementById('filterFLAIR').addEventListener('click', () => filterQCType('FLAIR'));
-document.getElementById('filterLST_AI').addEventListener('click', () => filterQCType('LST_AI'));
-document.getElementById('resetFilter').addEventListener('click', resetFilter);
-document.getElementById('exportCSV').addEventListener('click', exportCSV);
-document.getElementById('applyUserFilter').addEventListener('click', () => {
-    currentUserFilter = document.getElementById('userFilter').value;
-    fetchQCLogs();
-});
-document.getElementById('deleteAllUserEntries').addEventListener('click', deleteAllUserEntries);

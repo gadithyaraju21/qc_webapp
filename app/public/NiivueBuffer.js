@@ -1,12 +1,16 @@
 class NiivueBuffer {
-    constructor(bufferSize = 5, sessionId, workerCount = 5) {
-        this.bufferSize = bufferSize;
+    constructor(bufferSize = 7, cacheSize = 20, sessionId, workerCount = 5) {
+        this.bufferSize = bufferSize; // Number of images to keep in immediate buffer
+        this.cacheSize = cacheSize; // Number of images to keep in LRU cache
         this.sessionId = sessionId;
         this.workerCount = workerCount;
-        this.buffer = new Map();
-        this.loadQueue = new Set();
+        this.buffer = new Map(); // Immediate buffer for quick access
+        this.cache = new Map(); // LRU cache for recently used images
+        this.loadQueue = new Set(); // Queue for images to be loaded
         this.currentIndex = 0;
         this.workers = [];
+        this.patientSessions = []; // Will be populated in initialize method
+        this.qcType = ''; // Will be set in initialize method
         this.initializeWorkers();
     }
 
@@ -27,14 +31,18 @@ class NiivueBuffer {
     async initialize(patientSessions, qcType) {
         this.patientSessions = patientSessions;
         this.qcType = qcType;
+        this.currentIndex = 0;
         await this.fillBuffer();
     }
 
     async fillBuffer() {
-        // console.log('Filling buffer...');
-        const endIndex = Math.min(this.currentIndex + this.bufferSize, this.patientSessions.length);
-        for (let i = this.currentIndex; i < endIndex; i++) {
-            if (!this.buffer.has(i) && !this.loadQueue.has(i)) {
+        const totalImages = this.patientSessions.length;
+        const startIndex = Math.max(0, this.currentIndex - 3);
+        const endIndex = Math.min(totalImages - 1, this.currentIndex + 3);
+
+        // Add images to load queue if they're not in buffer or cache
+        for (let i = startIndex; i <= endIndex; i++) {
+            if (!this.buffer.has(i) && !this.cache.has(i) && !this.loadQueue.has(i)) {
                 this.loadQueue.add(i);
             }
         }
@@ -42,7 +50,6 @@ class NiivueBuffer {
     }
 
     processQueue() {
-        // console.log(`Processing queue. Queue size: ${this.loadQueue.size}, Buffer size: ${this.buffer.size}`);
         while (this.loadQueue.size > 0 && this.buffer.size < this.bufferSize) {
             const index = this.loadQueue.values().next().value;
             this.loadQueue.delete(index);
@@ -51,7 +58,6 @@ class NiivueBuffer {
     }
 
     preloadImage(index) {
-        // console.log(`Preloading image for index: ${index}`);
         const { patient, session } = this.patientSessions[index];
         const imageType = this.qcType === 'LST_AI' ? 'FLAIR' : this.qcType;
         const worker = this.workers[index % this.workerCount];
@@ -67,7 +73,7 @@ class NiivueBuffer {
 
         // Set a timeout for the worker
         setTimeout(() => {
-            if (!this.buffer.has(index)) {
+            if (!this.buffer.has(index) && !this.cache.has(index)) {
                 console.error(`Timeout for image loading at index: ${index}`);
                 this.handleWorkerError({ message: 'Timeout', index });
             }
@@ -80,8 +86,7 @@ class NiivueBuffer {
             console.error(`Worker error for index ${index}:`, error);
             this.handleWorkerError({ message: error, index });
         } else if (action === 'preloadComplete') {
-            // console.log(`Preload complete for index: ${index}`);
-            this.buffer.set(index, imageData);
+            this.addToBufferAndCache(index, imageData);
             this.processQueue();
         }
     }
@@ -95,17 +100,23 @@ class NiivueBuffer {
     }
 
     async getImage(index) {
-        // console.log(`Attempting to get image for index: ${index}`);
+        // Check buffer first
         if (this.buffer.has(index)) {
-            // console.log(`Image found in buffer for index: ${index}`);
             return this.buffer.get(index);
         }
-        console.log(`Image not in buffer, loading for index: ${index}`);
+        // Check cache next
+        if (this.cache.has(index)) {
+            const imageData = this.cache.get(index);
+            this.cache.delete(index);
+            this.addToBufferAndCache(index, imageData);
+            return imageData;
+        }
+        // If not in buffer or cache, load the image
+        console.log(`Image not in buffer or cache, loading for index: ${index}`);
         return this.loadImage(index);
     }
 
     async loadImage(index) {
-       // console.log(`Loading image for index: ${index}`);
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 reject(new Error(`Timeout while loading image for index: ${index}`));
@@ -118,6 +129,7 @@ class NiivueBuffer {
                     if (e.data.error) {
                         reject(new Error(e.data.error));
                     } else {
+                        this.addToBufferAndCache(index, e.data.imageData);
                         resolve(e.data.imageData);
                     }
                 }
@@ -128,6 +140,22 @@ class NiivueBuffer {
                 this.processQueue();
             }
         });
+    }
+
+    addToBufferAndCache(index, imageData) {
+        // Add to buffer
+        this.buffer.set(index, imageData);
+        if (this.buffer.size > this.bufferSize) {
+            const oldestBufferKey = this.buffer.keys().next().value;
+            this.buffer.delete(oldestBufferKey);
+        }
+
+        // Add to cache
+        if (this.cache.size >= this.cacheSize) {
+            const oldestCacheKey = this.cache.keys().next().value;
+            this.cache.delete(oldestCacheKey);
+        }
+        this.cache.set(index, imageData);
     }
 
     async moveNext() {
@@ -143,17 +171,38 @@ class NiivueBuffer {
     }
 
     async updateBuffer() {
-        // console.log('Updating buffer...');
-        const minIndex = this.currentIndex - Math.floor(this.bufferSize / 2);
-        const maxIndex = this.currentIndex + Math.floor(this.bufferSize / 2);
+        const totalImages = this.patientSessions.length;
+        const minIndex = Math.max(0, this.currentIndex - 3);
+        const maxIndex = Math.min(totalImages - 1, this.currentIndex + 3);
         
+        // Remove images from buffer that are no longer needed
         for (const [index, _] of this.buffer) {
             if (index < minIndex || index > maxIndex) {
+                const imageData = this.buffer.get(index);
                 this.buffer.delete(index);
+                // Move to cache if not already there
+                if (!this.cache.has(index)) {
+                    this.addToBufferAndCache(index, imageData);
+                }
             }
         }
 
-        await this.fillBuffer();
+        // Add new images to the buffer
+        for (let i = minIndex; i <= maxIndex; i++) {
+            if (!this.buffer.has(i) && !this.loadQueue.has(i)) {
+                if (this.cache.has(i)) {
+                    // If in cache, move to buffer
+                    const imageData = this.cache.get(i);
+                    this.cache.delete(i);
+                    this.addToBufferAndCache(i, imageData);
+                } else {
+                    // If not in cache, add to load queue
+                    this.loadQueue.add(i);
+                }
+            }
+        }
+
+        this.processQueue();
     }
 }
 
