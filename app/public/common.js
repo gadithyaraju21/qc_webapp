@@ -10,6 +10,7 @@
             const response = await global.fetchWithAuth('/user-info');
             const userInfo = await response.json();
             global.setUserStatus(userInfo.username, userInfo.isAdmin);
+            global.initFullScreenButton();
             return userInfo;
         } catch (error) {
             console.error('Error checking auth:', error);
@@ -19,6 +20,33 @@
             return null;
         }
     };
+
+    global.toggleFullScreen = function() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    };
+
+    global.initFullScreenButton = function() {
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', global.toggleFullScreen);
+        }
+
+        document.addEventListener('fullscreenchange', function() {
+            if (fullscreenBtn) {
+                fullscreenBtn.querySelector('.material-icons').textContent = 
+                    document.fullscreenElement ? 'fullscreen_exit' : 'fullscreen';
+            }
+        });
+    };
+   
 
     global.setUserStatus = function(username, isAdmin) {
         const userStatusElement = document.getElementById('userStatus');
@@ -33,7 +61,7 @@
         }
         
         // Show/hide admin-specific elements
-        const adminElements = document.querySelectorAll('.admin-only');
+        const adminElements = document.querySelectorAll('.admin-only, .admin-controls');
         adminElements.forEach(el => {
             el.style.display = isAdmin ? 'block' : 'none';
         });

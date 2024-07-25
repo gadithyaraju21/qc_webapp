@@ -370,106 +370,6 @@ app.get('/admin/check-auth', authenticate, (req, res) => {
     }
 });
 
-app.post('/admin/addUser', authenticate, requireAdminAuth, async (req, res) => {
-    const { username, password, isAdmin } = req.body;
-
-    try {
-        const existingUser = await db.get('SELECT * FROM users WHERE username = ?', [username]);
-        if (existingUser) {
-            return res.status(400).json({ error: 'Username already exists' });
-        }
-
-        const hashedPassword = hashPassword(password);
-        await db.run('INSERT INTO users (username, password, isAdmin) VALUES (?, ?, ?)', [username, hashedPassword, isAdmin ? 1 : 0]);
-        res.status(201).json({ message: 'User added successfully' });
-    } catch (error) {
-        console.error('Error adding user:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-app.post('/admin/resetPassword/:username', authenticate, requireAdminAuth, async (req, res) => {
-    const username = req.params.username;
-    const tempPassword = crypto.randomBytes(8).toString('hex');
-    const hashedPassword = hashPassword(tempPassword);
-
-    try {
-        const result = await db.run('UPDATE users SET password = ? WHERE username = ?', [hashedPassword, username]);
-        if (result.changes > 0) {
-            res.json({ message: 'Password reset successfully', tempPassword });
-        } else {
-            res.status(404).json({ error: 'User not found' });
-        }
-    } catch (error) {
-        console.error('Error resetting password:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-app.put('/admin/editUser/:username', authenticate, requireAdminAuth, async (req, res) => {
-    const username = req.params.username;
-    const { newUsername, isAdmin } = req.body;
-
-    try {
-        if (newUsername && newUsername !== username) {
-            const existingUser = await db.get('SELECT * FROM users WHERE username = ?', [newUsername]);
-            if (existingUser) {
-                return res.status(400).json({ error: 'New username already exists' });
-            }
-        }
-
-        let query = 'UPDATE users SET';
-        const params = [];
-        if (newUsername) {
-            query += ' username = ?,';
-            params.push(newUsername);
-        }
-        if (isAdmin !== undefined) {
-            query += ' isAdmin = ?,';
-            params.push(isAdmin ? 1 : 0);
-        }
-        query = query.slice(0, -1); // Remove the last comma
-        query += ' WHERE username = ?';
-        params.push(username);
-
-        const result = await db.run(query, params);
-        if (result.changes > 0) {
-            res.json({ message: 'User updated successfully' });
-        } else {
-            res.status(404).json({ error: 'User not found' });
-        }
-    } catch (error) {
-        console.error('Error updating user:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-app.get('/admin/users', authenticate, requireAdminAuth, async (req, res) => {
-    try {
-        const users = await db.all('SELECT username, isAdmin FROM users');
-        res.json(users);
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-app.delete('/admin/deleteUser/:username', authenticate, requireAdminAuth, async (req, res) => {
-    const username = req.params.username;
-
-    try {
-        const result = await db.run('DELETE FROM users WHERE username = ? AND isAdmin = 0', [username]);
-        if (result.changes > 0) {
-            res.json({ message: 'User deleted successfully' });
-        } else {
-            res.status(404).json({ error: 'User not found or cannot be deleted' });
-        }
-    } catch (error) {
-        console.error('Error deleting user:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
 // Add a new route for deleting entries
 app.delete('/admin/deleteEntry', authenticate, requireAdminAuth, async (req, res) => {
     const { username, patientID, sessionID, qcType } = req.body;
@@ -507,10 +407,62 @@ app.delete('/admin/deleteAllUserEntries', authenticate, requireAdminAuth, async 
     }
 });
 
-app.get('/admin/users/:username', authenticate, requireAdminAuth, async (req, res) => {
+// Add user route
+app.post('/admin/addUser', authenticate, async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        const existingUser = await db.get('SELECT * FROM users WHERE username = ?', [username]);
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+
+        const hashedPassword = hashPassword(password);
+        await db.run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword]);
+        res.status(201).json({ message: 'User added successfully' });
+    } catch (error) {
+        console.error('Error adding user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Edit user route
+app.put('/admin/editUser/:username', authenticate, async (req, res) => {
+    const username = req.params.username;
+    const { newUsername } = req.body;
+
+    try {
+        if (newUsername && newUsername !== username) {
+            const existingUser = await db.get('SELECT * FROM users WHERE username = ?', [newUsername]);
+            if (existingUser) {
+                return res.status(400).json({ error: 'New username already exists' });
+            }
+        }
+
+        await db.run('UPDATE users SET username = ? WHERE username = ?', [newUsername, username]);
+        res.json({ message: 'User updated successfully' });
+    } catch (error) {
+        console.error('Error updating user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Get all users route
+app.get('/admin/users', authenticate, async (req, res) => {
+    try {
+        const users = await db.all('SELECT username FROM users');
+        res.json(users);
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Get user details route
+app.get('/admin/users/:username', authenticate, async (req, res) => {
     const username = req.params.username;
     try {
-        const user = await db.get('SELECT username, isAdmin FROM users WHERE username = ?', [username]);
+        const user = await db.get('SELECT username FROM users WHERE username = ?', [username]);
         if (user) {
             res.json(user);
         } else {
@@ -521,6 +473,49 @@ app.get('/admin/users/:username', authenticate, requireAdminAuth, async (req, re
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+// Reset password route
+app.post('/admin/resetPassword/:username', authenticate, async (req, res) => {
+    const username = req.params.username;
+    const { newPassword } = req.body;
+    const hashedPassword = hashPassword(newPassword);
+
+    try {
+        const result = await db.run('UPDATE users SET password = ? WHERE username = ?', [hashedPassword, username]);
+        if (result.changes > 0) {
+            res.json({ message: 'Password reset successfully' });
+        } else {
+            res.status(404).json({ error: 'User not found' });
+        }
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+// Delete user route
+app.delete('/admin/deleteUser/:username', authenticate, async (req, res) => {
+    const username = req.params.username;
+
+    if (username.toLowerCase() === 'admin') {
+        return res.status(403).json({ error: 'Cannot delete admin user' });
+    }
+
+    try {
+        const result = await db.run('DELETE FROM users WHERE username = ?', [username]);
+        if (result.changes > 0) {
+            res.json({ message: 'User deleted successfully' });
+        } else {
+            res.status(404).json({ error: 'User not found or cannot be deleted' });
+        }
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
 
 // Start the server
 async function startServer() {

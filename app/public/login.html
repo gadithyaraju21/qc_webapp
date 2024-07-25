@@ -4,30 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Medical Imaging QC</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="common.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
+    <style>
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-form {
+            background-color: var(--secondary-bg);
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            width: 100%;
+            max-width: 400px;
+        }
+        #error-message {
+            color: var(--error-color);
+            text-align: center;
+            margin-top: 1rem;
+        }
+    </style>
 </head>
 <body>
-    <div class="container login-container">
-        <div class="login-form card">
-            <h1><i class="fas fa-microscope"></i> Medical Imaging QC</h1>
-            <h2><i class="fas fa-sign-in-alt"></i> Login</h2>
+    <div class="login-container">
+        <div class="login-form">
+            <h1>Medical Imaging QC</h1>
             <form id="loginForm">
-                <div class="input-group">
-                    <i class="fas fa-user"></i>
-                    <input type="text" id="username" placeholder="Username" required>
+                <div class="form-group">
+                    <label for="username">
+                        <span class="material-icons">person</span> Username
+                    </label>
+                    <input type="text" id="username" name="username" required>
                 </div>
-                <div class="input-group">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="password" placeholder="Password" required>
+                <div class="form-group">
+                    <label for="password">
+                        <span class="material-icons">lock</span> Password
+                    </label>
+                    <input type="password" id="password" name="password" required>
                 </div>
-                <button type="submit"><i class="fas fa-sign-in-alt"></i> Login</button>
+                <button type="submit" class="btn">
+                    <span class="material-icons">login</span> Login
+                </button>
             </form>
             <div id="error-message"></div>
         </div>
     </div>
-    <script src="common.js"></script>
+
     <script src="login.js"></script>
 </body>
 </html>

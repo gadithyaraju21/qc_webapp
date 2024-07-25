@@ -6,96 +6,26 @@
     <meta name="description" content="Quality Control Review for Medical Imaging">
     <title>QC Review - Medical Imaging QC</title>
     
-    <!-- External stylesheets -->
-    <link rel="stylesheet" href="common.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="common.css">
     
-    <!-- External scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@niivue/niivue@0.38.0/dist/niivue.umd.js"></script>
-    <script src="common.js"></script>
     
-    <!-- Module imports -->
-    <script type="module">
-        import NiivueBuffer from './NiivueBuffer.js';
-        window.NiivueBuffer = NiivueBuffer;
-    </script>
-    
-    <style>
-        /* QC-specific styles */
-        #gl {
-            width: 100%;
-            height: 100%;
-        }
-    
-        @keyframes quickPulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.03); }
-        }
-    
-        .qc-options button.animate {
-            animation: quickPulse 0.1s ease;
-        }
-    
-        /* Styles that might need adjustments based on specific QC page layout */
-        .content-container {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-    
-        .image-panel {
-            flex: 1;
-            background-color: #000;
-            overflow: hidden;
-        }
-    
-        .control-panel {
-            flex: 0 0 300px;
-            padding: 1rem;
-            background-color: var(--secondary-bg);
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem; /* Add spacing between elements */
-        }
-    
-        /* Media query for responsive design specific to QC page */
-        @media (max-width: 768px) {
-            .content-container {
-                flex-direction: column;
-            }
-            .control-panel {
-                flex: 0 0 auto;
-                width: 100%;
-            }
-        }
-
-        /* Equal length for buttons */
-        .nav-buttons button {
-            flex: 1;
-        }
-
-        /* Additional styling to reduce clutter */
-        .control-group, .opacity-control, .nav-buttons {
-            margin-bottom: 1rem;
-        }
-
-        .qc-options button {
-            width: 100%;
-            margin-bottom: 0.5rem;
-        }
-    </style>
 </head>
 <body onload="checkAuth(); initializeApp();">
     <div class="page-container">
         <nav class="nav-bar">
             <ul>
-                <li><a href="filter.html"><i class="fas fa-home"></i> Home</a></li>
-                <li><a href="database.html"><i class="fas fa-database"></i> Database</a></li>
-                <li><a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-                <li><i class="fas fa-info-circle info-icon" onclick="openModal()"></i></li>
-                <li><span id="userStatus">Logged in as: </span></li>
+                <li><a href="filter.html"><span class="material-icons">home</span> Home</a></li>
+                <li><a href="database.html"><span class="material-icons">storage</span> Database</a></li>
+                <li class="admin-only"><a href="manage-users.html"><span class="material-icons">group</span> Manage Users</a></li>
+                <li><span class="material-icons" onclick="openModal()">info</span></li>
+                <li><a href="#" onclick="logout()"><span class="material-icons">exit_to_app</span> Logout</a></li>
+                <button id="fullscreenBtn">
+                    <span class="material-icons">fullscreen</span>
+                    <span class="button-text">Enter Fullscreen</span>
+                </button>
             </ul>
         </nav>
         <div class="content-container">
@@ -103,44 +33,42 @@
                 <canvas id="gl"></canvas>
             </div>
             <div class="control-panel">
-                <div class="patient-info" id="patient-info">Patient: Loading... | Session: Loading...</div>
+                <div id="patient-info">Patient: Loading... | Session: Loading...</div>
                 <div class="controls">
-                    <div class="control-group">
+                    <div class="form-group">
                         <label for="viewMode">View Mode:</label>
                         <select id="viewMode" class="select-styled">
                             <option value="multiplanar">Multiplanar</option>
                             <option value="render">3D Render</option>
                         </select>
                     </div>
-                    <div class="opacity-control" id="opacityControl" style="display: none;">
+                    <div id="opacityControl" style="display: none;">
                         <label for="opacitySlider">Mask Opacity:</label>
                         <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="1">
                     </div>
                 </div>
-                <div class="qc-options" id="qcOptions">
+                <div id="qcOptions" class="qc-options">
                     <!-- QC options will be dynamically inserted here -->
                 </div>
                 <div class="nav-buttons">
-                    <button class="button button-secondary" onclick="loadPrevious()"><i class="fas fa-chevron-left"></i> Previous</button>
-                    <button class="button button-primary" onclick="loadNext()"><i class="fas fa-chevron-right"></i> Next</button>
+                    <button class="btn secondary" onclick="loadPrevious()"><span class="material-icons">chevron_left</span> Previous</button>
+                    <button class="btn" onclick="loadNext()">Next <span class="material-icons">chevron_right</span></button>
                 </div>
             </div>
         </div>
-        <div id="infoModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeModal()">&times;</span>
-                <h2>How to Use This Page</h2>
-                <div class="keyboard-controls">
-                    <ul>
-                        <li><span class="key">&larr;</span> Navigate to previous patient</li>
-                        <li><span class="key">&rarr;</span> Navigate to next patient</li>
-                        <li><span class="key">&uarr;</span> Move to previous QC option</li>
-                        <li><span class="key">&darr;</span> Move to next QC option</li>
-                        <li><span class="key">Enter</span> Select highlighted QC option</li>
-                    </ul>
-                </div>
-                <p>Use the arrow keys to navigate between patients and QC options. The currently selected QC option will be highlighted in green. Press Enter to confirm your selection and move to the next patient.</p>
-            </div>
+    </div>
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>How to Use This Page</h2>
+            <ul>
+                <li><span class="material-icons">arrow_back</span> Navigate to previous patient</li>
+                <li><span class="material-icons">arrow_forward</span> Navigate to next patient</li>
+                <li><span class="material-icons">arrow_upward</span> Move to previous QC option</li>
+                <li><span class="material-icons">arrow_downward</span> Move to next QC option</li>
+                <li><span class="material-icons">keyboard_return</span> Select highlighted QC option</li>
+            </ul>
+            <p>Use the arrow keys to navigate between patients and QC options. The currently selected QC option will be highlighted. Press Enter to confirm your selection and move to the next patient.</p>
         </div>
     </div>
     <div id="status-screen" class="status-screen">
@@ -150,6 +78,12 @@
           <div class="loader"></div>
         </div>
     </div>
+    <script src="common.js"></script>
+    <script type="module">
+        import NiivueBuffer from './NiivueBuffer.js';
+        window.NiivueBuffer = NiivueBuffer;
+    </script>
+
     <script>
         let nv, niivueBuffer;
         const bufferSize = 7; // Adjust as needed

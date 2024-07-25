@@ -1,86 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark">
-    <title>Medical Imaging QC</title>
-    <link rel="stylesheet" href="common.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
-    <script src="common.js"></script>
+    <title>Select QC Type</title>
+    <link rel="stylesheet" href="common.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .filter-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .card-container {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+        .card {
+            background-color: var(--secondary-bg);
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            text-align: center;
+            transition: var(--transition);
+            cursor: pointer;
+            width: 250px;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .card:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-5px);
+            box-shadow: var(--shadow);
+        }
+        .card .material-icons {
+            font-size: 48px;
+            margin-bottom: 1rem;
+            color: var(--accent-color);
+        }
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+    </style>
 </head>
 <body>
-    <nav class="nav-bar">
-        <ul>
-            <li><a href="filter.html"><i class="fas fa-home"></i> Home</a></li>
-            <li><a href="database.html"><i class="fas fa-database"></i> Database</a></li>
-            <li class="admin-only" style="display: none;"><a href="manage-users.html"><i class="fas fa-users-cog"></i> Manage Users</a></li>
-            <li><a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-            <li><i class="fas fa-user"></i><span id="userStatus"></span></li>
-        </ul>
-    </nav>
-    
-    <div class="container">
-        <div class="filter-content card">
-            <h1><i class="fas fa-brain"></i> Medical Imaging QC</h1>
-            <h2>Select QC Type</h2>
-            <p>Choose the type of quality control you want to perform.</p>
-            <div class="button-group">
-                <button class="button button-primary" onclick="selectQC('T1')">
-                    <i class="fas fa-image"></i> QC T1 Images
+    <div class="page-container">
+        <nav class="nav-bar">
+            <ul>
+                <li><a href="filter.html"><span class="material-icons">home</span> Home</a></li>
+                <li><a href="database.html"><span class="material-icons">storage</span> Database</a></li>
+                <li class="admin-only"><a href="manage-users.html"><span class="material-icons">group</span> Manage Users</a></li>
+                <li><a href="#" onclick="logout()"><span class="material-icons">exit_to_app</span> Logout</a></li>
+                <button id="fullscreenBtn">
+                    <span class="material-icons">fullscreen</span>
+                    <span class="button-text">Enter Fullscreen</span>
                 </button>
-                <button class="button button-primary" onclick="selectQC('FLAIR')">
-                    <i class="fas fa-image"></i> QC FLAIR Images
-                </button>
-                <button class="button button-primary" onclick="selectQC('LST_AI')">
-                    <i class="fas fa-image"></i> QC LST AI (FLAIR with masks)
-                </button>
+            </ul>
+        </nav>
+
+        <div class="container filter-content">
+            <h1>Select QC Type</h1>
+            <div class="card-container">
+                <div class="card" onclick="selectQCType('T1')">
+                    <span class="material-icons">image</span>
+                    <div class="card-title">QC T1 Images</div>
+                </div>
+                <div class="card" onclick="selectQCType('FLAIR')">
+                    <span class="material-icons">image</span>
+                    <div class="card-title">QC FLAIR Images</div>
+                </div>
+                <div class="card" onclick="selectQCType('LST_AI')">
+                    <span class="material-icons">layers</span>
+                    <div class="card-title">QC LST AI (FLAIR with masks)</div>
+                </div>
             </div>
         </div>
     </div>
-    <div id="message" class="message" style="display: none;"></div>
+
+    <script src="common.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            checkAuth().then((userInfo) => {
-                if (userInfo) {
-                    setUserStatus(userInfo.username, userInfo.isAdmin);
-                }
-            }).catch((error) => {
-                console.error('Authentication check failed:', error);
-                window.location.href = '/login.html';
-            });
+            checkAuth();
         });
-
-        async function selectQC(qcType) {
-            try {
-                const response = await fetchWithAuth(`/patients-sessions?qcType=${qcType}`);
-                const patientSessions = await response.json();
-
-                if (patientSessions.length === 0) {
-                    showMessage('No patient sessions available for this QC type.', 'warning');
-                    return;
-                }
-
-                localStorage.setItem('currentQCType', qcType);
-                localStorage.setItem('patientSessions', JSON.stringify(patientSessions));
-
-                window.location.href = `qc.html?qcType=${qcType}`;
-            } catch (error) {
-                console.error('Error fetching patient sessions:', error);
-                showMessage('Failed to fetch patient sessions. Please try again.', 'error');
-            }
-        }
-
-        function showMessage(message, type = 'info') {
-            const messageElement = document.getElementById('message');
-            messageElement.textContent = message;
-            messageElement.className = `message ${type}`;
-            messageElement.style.display = 'block';
-
-            setTimeout(() => {
-                messageElement.style.display = 'none';
-            }, 5000);
+        function selectQCType(qcType) {
+            window.location.href = `qc.html?qcType=${qcType}`;
         }
     </script>
 </body>

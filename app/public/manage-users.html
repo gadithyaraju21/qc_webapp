@@ -4,60 +4,117 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Users - Medical Imaging QC</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="common.css">
-    <script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
+    <style>
+        .user-management-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .user-list {
+            margin-bottom: 2rem;
+        }
+        .btn-add {
+            margin: 1rem 0;
+        }
+        .feedback-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+        }
+        .feedback-message.success { background-color: var(--success-color); }
+        .feedback-message.error { background-color: var(--error-color); }
+    </style>
 </head>
 <body>
-    <nav class="nav-bar">
-        <ul>
-            <li><a href="filter.html"><i class="fas fa-home"></i> Home</a></li>
-            <li><a href="database.html"><i class="fas fa-database"></i> Database</a></li>
-            <li class="admin-only"><a href="manage-users.html"><i class="fas fa-users-cog"></i> Manage Users</a></li>
-            <li><a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-            <li id="userStatus"><i class="fas fa-user"></i> </li>
-        </ul>
-    </nav>
+    <div class="page-container">
+        <nav class="nav-bar">
+            <ul>
+                <li><a href="filter.html"><span class="material-icons">home</span> Home</a></li>
+                <li><a href="database.html"><span class="material-icons">storage</span> Database</a></li>
+                <li class="admin-only"><a href="manage-users.html"><span class="material-icons">group</span> Manage Users</a></li>
+                <li><a href="#" onclick="logout()"><span class="material-icons">exit_to_app</span> Logout</a></li>
+                <button id="fullscreenBtn">
+                    <span class="material-icons">fullscreen</span>
+                    <span class="button-text">Enter Fullscreen</span>
+                </button>
+            </ul>
+        </nav>
 
-    <div class="container">
-        <h1><i class="fas fa-users-cog"></i> Manage Users</h1>
-        
-        <div id="addUserForm">
-            <h2><i class="fas fa-user-plus"></i> Add New User</h2>
-            <form>
-                <input type="text" id="newUsername" placeholder="Username" required>
-                <input type="password" id="newPassword" placeholder="Password" required>
-                <label for="newUserIsAdmin">
-                    <input type="checkbox" id="newUserIsAdmin"> Admin
-                </label>
-                <button type="submit"><i class="fas fa-plus-circle"></i> Add User</button>
+        <div class="container">
+            <div class="user-management-container">
+                <h1>Manage Users</h1>
+
+                <div class="user-list">
+                    <h2>User List</h2>
+                    <table id="userTable">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- User rows will be dynamically inserted here -->
+                        </tbody>
+                    </table>
+                    <button id="addUserBtn" class="btn btn-add">
+                        <span class="material-icons">person_add</span> Add User
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="editUserModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="editModalTitle">Edit User</h2>
+            <form id="editUserForm">
+                <div class="form-group">
+                    <label for="editUsername">Username:</label>
+                    <input type="text" id="editUsername" required>
+                </div>
+                <button type="submit" id="editSubmitBtn" class="btn">Update Username</button>
             </form>
-            <p id="addUserFeedback"></p>
-        </div>
-
-        <div id="userList">
-            <h2><i class="fas fa-list"></i> User List</h2>
-            <table id="userTable">
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Role</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- User list will be populated by JavaScript -->
-                </tbody>
-            </table>
-            <p id="userListFeedback"></p>
+            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                <button id="resetPasswordBtn" class="btn">
+                    <span class="material-icons">key</span> Reset Password
+                </button>
+                <button id="deleteUserBtn" class="btn danger">
+                    <span class="material-icons">delete</span> Delete User
+                </button>
+            </div>
         </div>
     </div>
 
-    <div id="userModal" class="modal">
-        <div id="userModalContent" class="modal-content">
-            <!-- Modal content will be populated by JavaScript -->
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add New User</h2>
+            <form id="addUserForm">
+                <div class="form-group">
+                    <label for="newUsername">Username:</label>
+                    <input type="text" id="newUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">Password:</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <button type="submit" class="btn">Add User</button>
+            </form>
         </div>
-        <p id="modalFeedback"></p>
     </div>
+
+    <div id="feedbackMessage" class="feedback-message" style="display: none;"></div>
 
     <script src="common.js"></script>
     <script src="manage-users.js"></script>
