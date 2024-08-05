@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="common.css">
     
-    <script src="https://cdn.jsdelivr.net/npm/@niivue/niivue@0.38.0/dist/niivue.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@niivue/niivue@0.44.2/dist/niivue.umd.js"></script>
     
 </head>
 <body onload="checkAuth(); initializeApp();">
@@ -128,15 +128,42 @@
             hideStatusScreen();
 
         }
+        function getCSSColorAsRGBA(variableName) {
+            const color = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+            if (color.startsWith('#')) {
+                // If it's a hex color
+                const r = parseInt(color.slice(1, 3), 16) / 255;
+                const g = parseInt(color.slice(3, 5), 16) / 255;
+                const b = parseInt(color.slice(5, 7), 16) / 255;
+                return [r, g, b, .5]; // Assuming full opacity
+            } else if (color.startsWith('rgb')) {
+                // If it's rgb or rgba
+                const match = color.match(/[\d.]+/g);
+                if (match) {
+                    const [r, g, b, a = 1] = match.map(Number);
+                    return [r / 255, g / 255, b / 255, a];
+                }
+            }
+            // Fallback to black if parsing fails
+            return [0, 0, 0, 1];
+        }
+
+        // Get the background color from CSS variable
+        const backgroundColor = getCSSColorAsRGBA('--primary-bg');
 
         function initializeNiivue() {
             console.log('Initializing Niivue...');
             nv = new niivue.Niivue({
                 isResizeCanvas: true,
-                dragAndDropEnabled: true,
-                sliceType: niivue.SLICE_TYPE.MULTIPLANAR,
-                backColor: [0, 0, 0, 1],
-                crosshairColor: [1, 0, 0, 0.8],
+                dragAndDropEnabled: false,
+                //sliceType: niivue.SLICE_TYPE.MULTIPLANAR,
+                backColor: [0,0,0,1],
+                crosshairColor: [.2, 1, .3, .8],
+                //isRuler: true,
+                //isColorbar: true,
+                //isOrientCube: true,
+                //multiplanarForceRender: false,
+                multiplanarLayout: 0,
             });
             nv.attachTo("gl");
             console.log('Niivue initialized.');

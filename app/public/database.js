@@ -37,7 +37,6 @@ function displayQCLogs(qcLogs) {
             <td>${log.option}</td>
             <td>${log.date}</td>
             <td>${log.time}</td>
-            ${isAdmin() ? `<td><button class="btn danger" onclick="deleteEntry('${log.username}', '${log.patientID}', '${log.sessionID}', '${log.qcType}')"><i class="fas fa-trash-alt"></i> Delete</button></td>` : ''}
         `;
         tableBody.appendChild(row);
     });

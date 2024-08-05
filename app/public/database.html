@@ -8,14 +8,82 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="common.css">
     <style>
+        /* Database Page Specific Styles */
+        .database-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 60px); /* Adjust based on your nav-bar height */
+            overflow: hidden;
+            margin: 0;
+            max-width: none;
+            padding: 1rem;
+            background-color: var(--secondary-bg);
+        }
+    
+        .database-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+    
+        .database-controls {
+            margin-bottom: 1rem;
+        }
+    
         .filter-buttons {
             display: flex;
             flex-wrap: wrap;
             gap: 1rem;
             margin-bottom: 1rem;
         }
-        .admin-controls {
-            margin-bottom: 1rem;
+    
+        .table-container {
+            flex: 1;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+    
+        .database-table {
+            margin-top: 0;
+            width: 100%;
+        }
+    
+        .database-table th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: var(--secondary-bg);
+        }
+    
+        /* Custom scrollbar styles */
+        .table-container::-webkit-scrollbar {
+            width: 12px;
+        }
+    
+        .table-container::-webkit-scrollbar-track {
+            background: var(--primary-bg);
+        }
+    
+        .table-container::-webkit-scrollbar-thumb {
+            background-color: var(--accent-color);
+            border-radius: 6px;
+            border: 3px solid var(--primary-bg);
+        }
+    
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background-color: var(--primary-color);
+        }
+    
+        @media (max-width: 768px) {
+            .database-container {
+                height: auto;
+                overflow: visible;
+            }
+    
+            .table-container {
+                overflow-x: auto;
+            }
         }
     </style>
 </head>
@@ -24,7 +92,7 @@
         <nav class="nav-bar">
             <ul>
                 <li><a href="filter.html"><span class="material-icons">home</span> Home</a></li>
-                <li><a href="database.html"><span class="material-icons">storage</span> Database</a></li>
+                <li><a href="database.html" class="active"><span class="material-icons">storage</span> Database</a></li>
                 <li class="admin-only"><a href="manage-users.html"><span class="material-icons">group</span> Manage Users</a></li>
                 <li><a href="#" onclick="logout()"><span class="material-icons">exit_to_app</span> Logout</a></li>
                 <button id="fullscreenBtn">
@@ -34,53 +102,60 @@
             </ul>
         </nav>
 
-        <div class="container">
-            <h1>QC Log Database Viewer</h1>
+        <div class="database-container">
+            <div class="database-content">
+                <h1>QC Log Database Viewer</h1>
 
-            <div class="filter-buttons">
-                <button class="btn" onclick="filterQCType('T1')">
-                    <span class="material-icons">filter_alt</span> Filter T1
-                </button>
-                <button class="btn" onclick="filterQCType('FLAIR')">
-                    <span class="material-icons">filter_alt</span> Filter FLAIR
-                </button>
-                <button class="btn" onclick="filterQCType('LST_AI')">
-                    <span class="material-icons">filter_alt</span> Filter LST AI
-                </button>
-                <button class="btn" onclick="resetFilter()">
-                    <span class="material-icons">clear</span> Reset Filter
-                </button>
-                <button class="btn" onclick="exportCSV()">
-                    <span class="material-icons">download</span> Export Filtered Data as CSV
-                </button>
+                <div class="database-controls">
+                    <div class="filter-buttons">
+                        <button class="btn" onclick="filterQCType('T1')">
+                            <span class="material-icons">filter_alt</span> Filter T1
+                        </button>
+                        <button class="btn" onclick="filterQCType('FLAIR')">
+                            <span class="material-icons">filter_alt</span> Filter FLAIR
+                        </button>
+                        <button class="btn" onclick="filterQCType('LST_AI')">
+                            <span class="material-icons">filter_alt</span> Filter LST AI
+                        </button>
+                        <button class="btn" onclick="resetFilter()">
+                            <span class="material-icons">clear</span> Reset Filter
+                        </button>
+                        <button class="btn" onclick="exportCSV()">
+                            <span class="material-icons">download</span> Export Filtered Data as CSV
+                        </button>
+                    </div>
+
+                    <div id="adminControls" class="admin-controls">
+                        <div class="filter-buttons">
+                            <select id="userFilter" onchange="applyUserFilter()" class="btn">
+                                <span class="material-icons"></span><option value="">All Users</option>
+                            </select>
+                            <button class="btn danger" onclick="deleteAllUserEntries()">
+                                <span class="material-icons">delete_forever</span> Delete All Entries for Selected User
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="qcLogTable" class="database-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Patient ID</th>
+                                <th>Session ID</th>
+                                <th>QC Type</th>
+                                <th>Option</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Table rows will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
-
-            <div id="adminControls" class="admin-controls">
-                <select id="userFilter" onchange="applyUserFilter()" class="btn">
-                    <option value="">All Users</option>
-                </select>
-                <button class="btn danger" onclick="deleteAllUserEntries()">
-                    <span class="material-icons">delete_forever</span> Delete All Entries for Selected User
-                </button>
-            </div>
-
-            <table id="qcLogTable">
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Patient ID</th>
-                        <th>Session ID</th>
-                        <th>QC Type</th>
-                        <th>Option</th>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th class="admin-only">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Table rows will be populated dynamically -->
-                </tbody>
-            </table>
         </div>
     </div>
 
